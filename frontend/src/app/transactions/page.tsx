@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Table,
   TableBody,
@@ -21,6 +22,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,10 +35,34 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { formatCurrency, formatDate, cn } from "@/lib/utils"
-import { Search, Plus, CalendarIcon } from "lucide-react"
+import {
+  Search,
+  Plus,
+  Filter,
+  MoreHorizontal,
+  CalendarIcon,
+  FileText,
+  Download,
+  Edit,
+  Trash2,
+  ArrowUpRight,
+  ArrowDownRight,
+  CreditCard,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Upload,
+  X,
+} from "lucide-react"
+import { DateRange } from "react-day-picker"
 import {
   fetchTransactions,
   fetchAccounts,
@@ -41,36 +72,240 @@ import {
   toNum,
 } from "@/lib/api-data"
 
-const categoriesMock = [
+// ============================================
+// MOCK DATA
+// ============================================
+
+const transactions = [
+  {
+    id: "1",
+    date: new Date("2024-12-15"),
+    description: "Supermercado Extra",
+    category: { name: "Alimentação", color: "#f43f5e", icon: "ShoppingCart" },
+    account: { name: "Nubank", type: "CREDIT_CARD" },
+    amount: -450.5,
+    type: "EXPENSE",
+    status: "COMPLETED",
+    hasAttachment: true,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "2",
+    date: new Date("2024-12-14"),
+    description: "Salário Mensal",
+    category: { name: "Renda", color: "#10b981", icon: "DollarSign" },
+    account: { name: "Itaú", type: "CHECKING" },
+    amount: 8500.0,
+    type: "INCOME",
+    status: "COMPLETED",
+    hasAttachment: false,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "3",
+    date: new Date("2024-12-13"),
+    description: "iPhone 15 Pro",
+    category: { name: "Eletrônicos", color: "#8b5cf6", icon: "Smartphone" },
+    account: { name: "Nubank", type: "CREDIT_CARD" },
+    amount: -899.9,
+    type: "EXPENSE",
+    status: "PENDING",
+    hasAttachment: true,
+    installmentNumber: 1,
+    totalInstallments: 12,
+  },
+  {
+    id: "4",
+    date: new Date("2024-12-12"),
+    description: "Uber - Viagem",
+    category: { name: "Transporte", color: "#f59e0b", icon: "Car" },
+    account: { name: "Nubank", type: "CREDIT_CARD" },
+    amount: -28.9,
+    type: "EXPENSE",
+    status: "COMPLETED",
+    hasAttachment: false,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "5",
+    date: new Date("2024-12-11"),
+    description: "Netflix Assinatura",
+    category: { name: "Lazer", color: "#06b6d4", icon: "Tv" },
+    account: { name: "Nubank", type: "CREDIT_CARD" },
+    amount: -39.9,
+    type: "EXPENSE",
+    status: "COMPLETED",
+    hasAttachment: true,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "6",
+    date: new Date("2024-12-10"),
+    description: "Freelance Projeto Web",
+    category: { name: "Renda Extra", color: "#10b981", icon: "Code" },
+    account: { name: "Itaú", type: "CHECKING" },
+    amount: 2500.0,
+    type: "INCOME",
+    status: "COMPLETED",
+    hasAttachment: true,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "7",
+    date: new Date("2024-12-09"),
+    description: "Aluguel Dezembro",
+    category: { name: "Moradia", color: "#8b5cf6", icon: "Home" },
+    account: { name: "Itaú", type: "CHECKING" },
+    amount: -2800.0,
+    type: "EXPENSE",
+    status: "COMPLETED",
+    hasAttachment: true,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "8",
+    date: new Date("2024-12-08"),
+    description: "Academia SmartFit",
+    category: { name: "Saúde", color: "#14b8a6", icon: "Dumbbell" },
+    account: { name: "Nubank", type: "CREDIT_CARD" },
+    amount: -99.9,
+    type: "EXPENSE",
+    status: "PENDING",
+    hasAttachment: false,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "9",
+    date: new Date("2024-12-07"),
+    description: "Restaurante Outback",
+    category: { name: "Alimentação", color: "#f43f5e", icon: "Utensils" },
+    account: { name: "Nubank", type: "CREDIT_CARD" },
+    amount: -180.0,
+    type: "EXPENSE",
+    status: "COMPLETED",
+    hasAttachment: false,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+  {
+    id: "10",
+    date: new Date("2024-12-06"),
+    description: "Dividendos BBAS3",
+    category: { name: "Investimentos", color: "#6366f1", icon: "TrendingUp" },
+    account: { name: "XP Investimentos", type: "INVESTMENT" },
+    amount: 450.75,
+    type: "INCOME",
+    status: "COMPLETED",
+    hasAttachment: false,
+    installmentNumber: null,
+    totalInstallments: null,
+  },
+]
+
+const categories = [
   { id: "1", name: "Alimentação", color: "#f43f5e" },
   { id: "2", name: "Renda", color: "#10b981" },
-  { id: "3", name: "Transporte", color: "#f59e0b" },
+  { id: "3", name: "Eletrônicos", color: "#8b5cf6" },
+  { id: "4", name: "Transporte", color: "#f59e0b" },
+  { id: "5", name: "Lazer", color: "#06b6d4" },
+  { id: "6", name: "Moradia", color: "#8b5cf6" },
+  { id: "7", name: "Saúde", color: "#14b8a6" },
+  { id: "8", name: "Investimentos", color: "#6366f1" },
 ]
-const accountsMock = [
+
+const accounts = [
   { id: "1", name: "Nubank", type: "CREDIT_CARD" },
   { id: "2", name: "Itaú", type: "CHECKING" },
+  { id: "3", name: "XP Investimentos", type: "INVESTMENT" },
 ]
+
+// ============================================
+// STATUS BADGE COMPONENT
+// ============================================
+
+function StatusBadge({ status }: { status: string }) {
+  const statusConfig = {
+    COMPLETED: {
+      label: "Pago",
+      variant: "success" as const,
+      icon: CheckCircle2,
+    },
+    PENDING: {
+      label: "Pendente",
+      variant: "warning" as const,
+      icon: Clock,
+    },
+    CANCELLED: {
+      label: "Cancelado",
+      variant: "destructive" as const,
+      icon: XCircle,
+    },
+    SCHEDULED: {
+      label: "Agendado",
+      variant: "info" as const,
+      icon: CalendarIcon,
+    },
+  }
+
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.PENDING
+  const Icon = config.icon
+
+  return (
+    <Badge variant={config.variant} className="gap-1">
+      <Icon className="h-3 w-3" />
+      {config.label}
+    </Badge>
+  )
+}
+
+// ============================================
+// TRANSACTION FORM COMPONENT
+// ============================================
 
 function TransactionForm({
   onClose,
   onSuccess,
-  categories,
-  accounts,
+  categories: formCategories,
+  accounts: formAccounts,
 }: {
   onClose: () => void
   onSuccess?: () => void
   categories: Array<{ id: string; name: string; color?: string }>
-  accounts: Array<{ id: string; name: string }>
+  accounts: Array<{ id: string; name: string; type?: string }>
 }) {
+  const [isInstallment, setIsInstallment] = useState(false)
+  const [date, setDate] = useState<Date>()
+  const [attachments, setAttachments] = useState<File[]>([])
   const [amount, setAmount] = useState("")
   const [description, setDescription] = useState("")
   const [type, setType] = useState<"INCOME" | "EXPENSE">("EXPENSE")
   const [accountId, setAccountId] = useState("")
   const [categoryId, setCategoryId] = useState("")
-  const [date, setDate] = useState<Date>()
   const [status, setStatus] = useState("COMPLETED")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const files = Array.from(e.dataTransfer.files)
+    setAttachments((prev) => [...prev, ...files])
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    setAttachments((prev) => [...prev, ...files])
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,7 +328,7 @@ function TransactionForm({
       return
     }
     if (!hasApi) {
-      setError("API não configurada (NEXT_PUBLIC_API_URL).")
+      setError("API não configurada. Defina NEXT_PUBLIC_API_URL.")
       return
     }
     setSaving(true)
@@ -122,12 +357,16 @@ function TransactionForm({
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      {error && <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>}
+      {error && (
+        <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Tipo</Label>
           <Select value={type} onValueChange={(v) => setType(v as "INCOME" | "EXPENSE")}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="EXPENSE">Despesa</SelectItem>
               <SelectItem value="INCOME">Receita</SelectItem>
@@ -136,23 +375,40 @@ function TransactionForm({
         </div>
         <div className="space-y-2">
           <Label>Valor</Label>
-          <Input type="number" step="0.01" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="0,00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
         </div>
       </div>
+
       <div className="space-y-2">
         <Label>Descrição</Label>
-        <Input placeholder="Ex: Supermercado" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <Input
+          placeholder="Ex: Supermercado Extra"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
       </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Categoria</Label>
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
             <SelectContent>
-              {categories.map((cat) => (
+              {formCategories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color ?? "#6366f1" }} />
+                    <div
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: cat.color ?? "#6366f1" }}
+                    />
                     {cat.name}
                   </div>
                 </SelectItem>
@@ -163,34 +419,52 @@ function TransactionForm({
         <div className="space-y-2">
           <Label>Conta</Label>
           <Select value={accountId} onValueChange={setAccountId}>
-            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
             <SelectContent>
-              {accounts.map((acc) => (
-                <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+              {formAccounts.map((acc) => (
+                <SelectItem key={acc.id} value={acc.id}>
+                  {acc.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Data</Label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-full justify-start", !date && "text-muted-foreground")}>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {date ? formatDate(date) : "Selecione"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
-              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                initialFocus
+              />
             </PopoverContent>
           </Popover>
         </div>
         <div className="space-y-2">
           <Label>Status</Label>
           <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="COMPLETED">Pago</SelectItem>
               <SelectItem value="PENDING">Pendente</SelectItem>
@@ -199,83 +473,232 @@ function TransactionForm({
           </Select>
         </div>
       </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="installment"
+          checked={isInstallment}
+          onCheckedChange={setIsInstallment}
+        />
+        <Label htmlFor="installment">Compra parcelada</Label>
+      </div>
+
+      {isInstallment && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Parcela Atual</Label>
+            <Input type="number" min={1} placeholder="1" />
+          </div>
+          <div className="space-y-2">
+            <Label>Total de Parcelas</Label>
+            <Input type="number" min={1} placeholder="12" />
+          </div>
+        </div>
+      )}
+
+      {/* File Upload */}
+      <div className="space-y-2">
+        <Label>Anexos</Label>
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleFileDrop}
+          className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer"
+        >
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleFileInput}
+            className="hidden"
+            id="file-upload"
+          />
+          <label htmlFor="file-upload" className="cursor-pointer">
+            <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Arraste arquivos aqui ou clique para selecionar
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              PDF, JPG, PNG (max. 10MB)
+            </p>
+          </label>
+        </div>
+
+        {attachments.length > 0 && (
+          <div className="space-y-2">
+            {attachments.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 bg-muted rounded-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm truncate max-w-[200px]">
+                    {file.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => removeAttachment(index)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Salvando…" : "Salvar Transação"}
+        </Button>
       </div>
     </form>
   )
 }
 
+// ============================================
+// MAIN TRANSACTIONS PAGE
+// ============================================
+
+type TransactionRow = {
+  id: string
+  date: Date
+  description: string
+  category: { name: string; color?: string }
+  account: { name: string; type?: string }
+  amount: number
+  type: string
+  status: string
+  hasAttachment?: boolean
+  installmentNumber: number | null
+  totalInstallments: number | null
+}
+
 export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [apiTransactions, setApiTransactions] = useState<Array<{
-    id: string
-    date: Date
-    description: string
-    category: { name: string }
-    account: { name: string }
-    amount: number
-    type: string
-    status: string
-  }>>([])
-  const [apiAccounts, setApiAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [apiTransactions, setApiTransactions] = useState<TransactionRow[]>([])
+  const [apiAccounts, setApiAccounts] = useState<Array<{ id: string; name: string; type?: string }>>([])
   const [apiCategories, setApiCategories] = useState<Array<{ id: string; name: string; color?: string }>>([])
   const [loading, setLoading] = useState(true)
 
-  const load = () => {
+  useEffect(() => {
     if (!hasApi) {
       setLoading(false)
       return
     }
-    Promise.all([fetchTransactions(), fetchAccounts(), fetchCategories()]).then(
-      ([txs, accs, cats]) => {
-        setApiTransactions(
-          txs.map((t) => ({
-            id: t.id,
-            date: new Date(t.date),
-            description: t.description,
-            category: { name: t.category?.name ?? "" },
-            account: { name: t.account?.name ?? "" },
-            amount: t.type === "INCOME" ? toNum(t.amount) : -toNum(t.amount),
-            type: t.type,
-            status: t.status,
-          }))
-        )
-        setApiAccounts(accs.map((a) => ({ id: a.id, name: a.name })))
-        setApiCategories(cats.map((c) => ({ id: c.id, name: c.name, color: c.color })))
-        setLoading(false)
-      }
-    ).catch(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    load()
+    let cancelled = false
+    Promise.all([
+      fetchTransactions(),
+      fetchAccounts(),
+      fetchCategories(),
+    ]).then(([txs, accs, cats]) => {
+      if (cancelled) return
+      setApiTransactions(
+        txs.map((t) => ({
+          id: t.id,
+          date: new Date(t.date),
+          description: t.description,
+          category: {
+            name: t.category?.name ?? "",
+            color: t.category?.color,
+          },
+          account: { name: t.account?.name ?? "", type: t.account?.type },
+          amount: t.type === "INCOME" ? toNum(t.amount) : -toNum(t.amount),
+          type: t.type,
+          status: t.status,
+          hasAttachment: false,
+          installmentNumber: null,
+          totalInstallments: null,
+        }))
+      )
+      setApiAccounts(accs.map((a) => ({ id: a.id, name: a.name, type: (a as { type?: string }).type })))
+      setApiCategories(cats.map((c) => ({ id: c.id, name: c.name, color: (c as { color?: string }).color })))
+      setLoading(false)
+    }).catch(() => setLoading(false))
+    return () => { cancelled = true }
   }, [])
 
-  const listCategories = hasApi && apiCategories.length > 0 ? apiCategories : categoriesMock
-  const listAccounts = hasApi && apiAccounts.length > 0 ? apiAccounts : accountsMock
-  const filtered = apiTransactions.filter((t) => {
-    const matchSearch = t.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchType = selectedType === "all" || t.type === selectedType
-    return matchSearch && matchType
+  const refetchTransactions = () => {
+    if (!hasApi) return
+    fetchTransactions().then((txs) =>
+      setApiTransactions(
+        txs.map((t) => ({
+          id: t.id,
+          date: new Date(t.date),
+          description: t.description,
+          category: {
+            name: t.category?.name ?? "",
+            color: t.category?.color,
+          },
+          account: { name: t.account?.name ?? "", type: t.account?.type },
+          amount: t.type === "INCOME" ? toNum(t.amount) : -toNum(t.amount),
+          type: t.type,
+          status: t.status,
+          hasAttachment: false,
+          installmentNumber: null,
+          totalInstallments: null,
+        }))
+      )
+    )
+  }
+
+  const listTransactions: TransactionRow[] =
+    hasApi && apiTransactions.length >= 0
+      ? apiTransactions
+      : transactions.map((t) => ({
+          ...t,
+          date: t.date instanceof Date ? t.date : new Date(t.date),
+        }))
+  const listCategories = hasApi && apiCategories.length > 0 ? apiCategories : categories
+  const listAccounts = hasApi && apiAccounts.length > 0 ? apiAccounts : accounts
+
+  const filteredTransactions = listTransactions.filter((t) => {
+    const matchesSearch = t.description
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+    const matchesCategory =
+      selectedCategory === "all" || t.category.name === selectedCategory
+    const matchesType = selectedType === "all" || t.type === selectedType
+    return matchesSearch && matchesCategory && matchesType
   })
 
-  const totalIncome = filtered.filter((t) => t.type === "INCOME").reduce((a, t) => a + (t.amount > 0 ? t.amount : 0), 0)
-  const totalExpense = filtered.filter((t) => t.type === "EXPENSE").reduce((a, t) => a + Math.abs(t.amount), 0)
+  const totalIncome = filteredTransactions
+    .filter((t) => t.type === "INCOME")
+    .reduce((acc, t) => acc + (t.amount > 0 ? t.amount : 0), 0)
+
+  const totalExpense = filteredTransactions
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transações</h1>
-          <p className="text-muted-foreground">Gerencie receitas e despesas</p>
+          <p className="text-muted-foreground">
+            Gerencie suas receitas e despesas
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" />Nova Transação</Button>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Transação
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
             <DialogHeader>
@@ -283,7 +706,7 @@ export default function TransactionsPage() {
             </DialogHeader>
             <TransactionForm
               onClose={() => setIsDialogOpen(false)}
-              onSuccess={() => { load(); setIsDialogOpen(false) }}
+              onSuccess={() => { refetchTransactions(); setIsDialogOpen(false) }}
               categories={listCategories}
               accounts={listAccounts}
             />
@@ -291,23 +714,144 @@ export default function TransactionsPage() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Receitas</p>
+                <p className="text-xl font-bold text-emerald-600">
+                  {formatCurrency(totalIncome)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-emerald-100 p-3">
+                <ArrowUpRight className="h-5 w-5 text-emerald-600" />
+              </div>
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Despesas</p>
+                <p className="text-xl font-bold text-rose-600">
+                  {formatCurrency(totalExpense)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-rose-100 p-3">
+                <ArrowDownRight className="h-5 w-5 text-rose-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Balanço</p>
+                <p
+                  className={`text-xl font-bold ${
+                    totalIncome - totalExpense >= 0
+                      ? "text-emerald-600"
+                      : "text-rose-600"
+                  }`}
+                >
+                  {formatCurrency(totalIncome - totalExpense)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-indigo-100 p-3">
+                <CreditCard className="h-5 w-5 text-indigo-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar transações..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {formatDate(dateRange.from)} - {formatDate(dateRange.to)}
+                      </>
+                    ) : (
+                      formatDate(dateRange.from)
+                    )
+                  ) : (
+                    "Período"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Select value={selectedCategory || "all"} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.name}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      {cat.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={selectedType || "all"} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="INCOME">Receita</SelectItem>
                 <SelectItem value="EXPENSE">Despesa</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button variant="outline" size="icon">
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
-        </CardHeader>
+        </CardContent>
+      </Card>
+
+      {/* Data Table */}
+      <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -318,36 +862,114 @@ export default function TransactionsPage() {
                 <TableHead>Conta</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma transação.</TableCell></TableRow>
-              ) : (
-                filtered.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="whitespace-nowrap">{formatDate(t.date)}</TableCell>
-                    <TableCell className="font-medium">{t.description}</TableCell>
-                    <TableCell>{t.category.name}</TableCell>
-                    <TableCell>{t.account.name}</TableCell>
-                    <TableCell className={t.amount >= 0 ? "text-emerald-600" : "text-rose-600"}>
-                      {t.amount >= 0 ? "+" : ""}{formatCurrency(t.amount)}
-                    </TableCell>
-                    <TableCell><Badge variant="secondary">{t.status}</Badge></TableCell>
-                  </TableRow>
-                ))
-              )}
+              {filteredTransactions.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell className="whitespace-nowrap">
+                    {formatDate(transaction.date)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {transaction.description}
+                      </span>
+                      {transaction.installmentNumber && (
+                        <span className="text-xs text-muted-foreground">
+                          Parcela {transaction.installmentNumber} de{" "}
+                          {transaction.totalInstallments}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className="gap-1"
+                      style={{
+                        borderColor: transaction.category.color,
+                        color: transaction.category.color,
+                      }}
+                    >
+                      <div
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: transaction.category.color }}
+                      />
+                      {transaction.category.name}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      {transaction.account.name}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`font-medium ${
+                        transaction.type === "INCOME"
+                          ? "text-emerald-600"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      {transaction.type === "INCOME" ? "+" : ""}
+                      {formatCurrency(transaction.amount)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={transaction.status} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {transaction.hasAttachment && (
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Ver Anexo
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <div className="flex gap-4 text-sm">
-        <span>Receitas: <strong className="text-emerald-600">{formatCurrency(totalIncome)}</strong></span>
-        <span>Despesas: <strong className="text-rose-600">{formatCurrency(totalExpense)}</strong></span>
-        <span>Mostrando {filtered.length} transações</span>
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Mostrando {filteredTransactions.length} de {transactions.length}{" "}
+          transações
+        </p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled>
+            Anterior
+          </Button>
+          <Button variant="outline" size="sm" disabled>
+            Próximo
+          </Button>
+        </div>
       </div>
     </div>
   )
