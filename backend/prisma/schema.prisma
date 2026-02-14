@@ -1,0 +1,200 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  accounts      Account[]
+  transactions  Transaction[]
+  categories    Category[]
+  budgets       Budget[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+// ============================================
+// ACCOUNTS (Bank Accounts, Credit Cards, Investments)
+// ============================================
+enum AccountType {
+  CHECKING
+  SAVINGS
+  INVESTMENT
+  CREDIT_CARD
+  WALLET
+  OTHER
+}
+
+model Account {
+  id              String      @id @default(uuid())
+  name            String
+  type            AccountType
+  initialBalance  Decimal     @default(0) @map("initial_balance") @db.Decimal(15, 2)
+  currentBalance  Decimal     @default(0) @map("current_balance") @db.Decimal(15, 2)
+  creditLimit     Decimal?    @map("credit_limit") @db.Decimal(15, 2)
+  dueDate         Int?        @map("due_date")
+  color           String      @default("#6366f1")
+  icon            String      @default("Wallet")
+  isActive        Boolean     @default(true) @map("is_active")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String        @map("user_id")
+  transactions Transaction[]
+
+  @@map("accounts")
+}
+
+// ============================================
+// CATEGORIES (Income & Expense Categories)
+// ============================================
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Category {
+  id          String          @id @default(uuid())
+  name        String
+  type        TransactionType
+  color       String          @default("#6366f1")
+  icon        String          @default("Tag")
+  isDefault   Boolean         @default(false) @map("is_default")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String        @map("user_id")
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([userId, name, type])
+  @@map("categories")
+}
+
+// ============================================
+// TRANSACTIONS (Income & Expenses)
+// ============================================
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  SCHEDULED
+}
+
+model Transaction {
+  id                  String            @id @default(uuid())
+  amount              Decimal           @db.Decimal(15, 2)
+  date                DateTime
+  description         String
+  type                TransactionType
+  status              TransactionStatus @default(COMPLETED)
+  installmentNumber   Int?              @map("installment_number")
+  totalInstallments   Int?              @map("total_installments")
+  parentTransactionId String?           @map("parent_transaction_id")
+  isRecurring         Boolean           @default(false) @map("is_recurring")
+  recurringFrequency  String?           @map("recurring_frequency")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String   @map("user_id")
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId   String   @map("account_id")
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId  String   @map("category_id")
+  attachments Attachment[]
+  parentTransaction Transaction?  @relation("Installments", fields: [parentTransactionId], references: [id])
+  childTransactions Transaction[] @relation("Installments")
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([accountId])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+// ============================================
+// ATTACHMENTS (Receipts, Invoices)
+// ============================================
+model Attachment {
+  id        String   @id @default(uuid())
+  url       String
+  fileName  String   @map("file_name")
+  fileType  String   @map("file_type")
+  size      Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String      @map("transaction_id")
+
+  @@map("attachments")
+}
+
+// ============================================
+// BUDGETS (Spending Goals by Category)
+// ============================================
+model Budget {
+  id          String   @id @default(uuid())
+  amount      Decimal  @db.Decimal(15, 2)
+  period      String   @default("MONTHLY")
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  alertAt80   Boolean  @default(true) @map("alert_at_80")
+  alertAt100  Boolean  @default(true) @map("alert_at_100")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String   @map("category_id")
+
+  @@unique([userId, categoryId, period])
+  @@map("budgets")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+enum NotificationType {
+  BUDGET_ALERT
+  DUE_DATE
+  SYSTEM
+  TRANSACTION
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false) @map("is_read")
+  data      Json?
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
