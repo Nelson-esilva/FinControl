@@ -1,83 +1,12 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
-import { Decimal } from '@prisma/client/runtime/library';
 export declare class AccountsService {
     private readonly prisma;
     constructor(prisma: PrismaService);
-    create(dto: CreateAccountDto): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        type: import(".prisma/client").$Enums.AccountType;
-        initialBalance: Decimal;
-        creditLimit: Decimal | null;
-        dueDate: number | null;
-        color: string;
-        icon: string;
-        isActive: boolean;
-        currentBalance: Decimal;
-        userId: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    findAll(): import(".prisma/client").Prisma.PrismaPromise<{
-        name: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        type: import(".prisma/client").$Enums.AccountType;
-        initialBalance: Decimal;
-        creditLimit: Decimal | null;
-        dueDate: number | null;
-        color: string;
-        icon: string;
-        isActive: boolean;
-        currentBalance: Decimal;
-        userId: string;
-    }[]>;
-    findOne(id: string): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        type: import(".prisma/client").$Enums.AccountType;
-        initialBalance: Decimal;
-        creditLimit: Decimal | null;
-        dueDate: number | null;
-        color: string;
-        icon: string;
-        isActive: boolean;
-        currentBalance: Decimal;
-        userId: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    update(id: string, dto: UpdateAccountDto): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        type: import(".prisma/client").$Enums.AccountType;
-        initialBalance: Decimal;
-        creditLimit: Decimal | null;
-        dueDate: number | null;
-        color: string;
-        icon: string;
-        isActive: boolean;
-        currentBalance: Decimal;
-        userId: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    remove(id: string): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        type: import(".prisma/client").$Enums.AccountType;
-        initialBalance: Decimal;
-        creditLimit: Decimal | null;
-        dueDate: number | null;
-        color: string;
-        icon: string;
-        isActive: boolean;
-        currentBalance: Decimal;
-        userId: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    create(dto: CreateAccountDto): any;
+    findAll(): any;
+    findOne(id: string): any;
+    update(id: string, dto: UpdateAccountDto): any;
+    remove(id: string): any;
 }
