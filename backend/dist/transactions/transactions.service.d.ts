@@ -1,0 +1,168 @@
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { TransactionType } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+export declare class TransactionsService {
+    private readonly prisma;
+    constructor(prisma: PrismaService);
+    create(dto: CreateTransactionDto): Promise<{
+        id: string;
+        amount: Decimal;
+        date: Date;
+        description: string;
+        type: import(".prisma/client").$Enums.TransactionType;
+        status: import(".prisma/client").$Enums.TransactionStatus;
+        installmentNumber: number | null;
+        totalInstallments: number | null;
+        isRecurring: boolean;
+        recurringFrequency: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        parentTransactionId: string | null;
+        userId: string;
+        accountId: string;
+        categoryId: string;
+    }>;
+    findAll(filters?: {
+        type?: TransactionType;
+        accountId?: string;
+        categoryId?: string;
+        from?: string;
+        to?: string;
+    }): import(".prisma/client").Prisma.PrismaPromise<({
+        account: {
+            id: string;
+            type: import(".prisma/client").$Enums.AccountType;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            name: string;
+            initialBalance: Decimal;
+            currentBalance: Decimal;
+            creditLimit: Decimal | null;
+            dueDate: number | null;
+            color: string;
+            icon: string;
+            isActive: boolean;
+        };
+        category: {
+            id: string;
+            type: import(".prisma/client").$Enums.TransactionType;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            name: string;
+            color: string;
+            icon: string;
+            isDefault: boolean;
+        };
+    } & {
+        id: string;
+        amount: Decimal;
+        date: Date;
+        description: string;
+        type: import(".prisma/client").$Enums.TransactionType;
+        status: import(".prisma/client").$Enums.TransactionStatus;
+        installmentNumber: number | null;
+        totalInstallments: number | null;
+        isRecurring: boolean;
+        recurringFrequency: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        parentTransactionId: string | null;
+        userId: string;
+        accountId: string;
+        categoryId: string;
+    })[]>;
+    findOne(id: string): import(".prisma/client").Prisma.Prisma__TransactionClient<{
+        account: {
+            id: string;
+            type: import(".prisma/client").$Enums.AccountType;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            name: string;
+            initialBalance: Decimal;
+            currentBalance: Decimal;
+            creditLimit: Decimal | null;
+            dueDate: number | null;
+            color: string;
+            icon: string;
+            isActive: boolean;
+        };
+        category: {
+            id: string;
+            type: import(".prisma/client").$Enums.TransactionType;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            name: string;
+            color: string;
+            icon: string;
+            isDefault: boolean;
+        };
+        attachments: {
+            id: string;
+            createdAt: Date;
+            url: string;
+            fileName: string;
+            fileType: string;
+            size: number;
+            transactionId: string;
+        }[];
+    } & {
+        id: string;
+        amount: Decimal;
+        date: Date;
+        description: string;
+        type: import(".prisma/client").$Enums.TransactionType;
+        status: import(".prisma/client").$Enums.TransactionStatus;
+        installmentNumber: number | null;
+        totalInstallments: number | null;
+        isRecurring: boolean;
+        recurringFrequency: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        parentTransactionId: string | null;
+        userId: string;
+        accountId: string;
+        categoryId: string;
+    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    update(id: string, dto: UpdateTransactionDto): Promise<{
+        id: string;
+        amount: Decimal;
+        date: Date;
+        description: string;
+        type: import(".prisma/client").$Enums.TransactionType;
+        status: import(".prisma/client").$Enums.TransactionStatus;
+        installmentNumber: number | null;
+        totalInstallments: number | null;
+        isRecurring: boolean;
+        recurringFrequency: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        parentTransactionId: string | null;
+        userId: string;
+        accountId: string;
+        categoryId: string;
+    }>;
+    remove(id: string): Promise<{
+        id: string;
+        amount: Decimal;
+        date: Date;
+        description: string;
+        type: import(".prisma/client").$Enums.TransactionType;
+        status: import(".prisma/client").$Enums.TransactionStatus;
+        installmentNumber: number | null;
+        totalInstallments: number | null;
+        isRecurring: boolean;
+        recurringFrequency: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        parentTransactionId: string | null;
+        userId: string;
+        accountId: string;
+        categoryId: string;
+    }>;
+}

@@ -68,6 +68,8 @@ import {
   fetchAccounts,
   fetchCategories,
   createTransaction as apiCreateTransaction,
+  updateTransaction as apiUpdateTransaction,
+  deleteTransaction as apiDeleteTransaction,
   hasApi,
   toNum,
 } from "@/lib/api-data"
@@ -269,26 +271,42 @@ function StatusBadge({ status }: { status: string }) {
 // TRANSACTION FORM COMPONENT
 // ============================================
 
+type TransactionFormInitial = {
+  id: string
+  amount: number
+  description: string
+  type: "INCOME" | "EXPENSE"
+  accountId: string
+  categoryId: string
+  date: Date
+  status: string
+  installmentNumber?: number | null
+  totalInstallments?: number | null
+}
+
 function TransactionForm({
   onClose,
   onSuccess,
   categories: formCategories,
   accounts: formAccounts,
+  initialTransaction,
 }: {
   onClose: () => void
   onSuccess?: () => void
   categories: Array<{ id: string; name: string; color?: string }>
   accounts: Array<{ id: string; name: string; type?: string }>
+  initialTransaction?: TransactionFormInitial | null
 }) {
-  const [isInstallment, setIsInstallment] = useState(false)
-  const [date, setDate] = useState<Date>()
+  const isEdit = Boolean(initialTransaction)
+  const [isInstallment, setIsInstallment] = useState(Boolean(initialTransaction?.installmentNumber))
+  const [date, setDate] = useState<Date | undefined>(initialTransaction?.date)
   const [attachments, setAttachments] = useState<File[]>([])
-  const [amount, setAmount] = useState("")
-  const [description, setDescription] = useState("")
-  const [type, setType] = useState<"INCOME" | "EXPENSE">("EXPENSE")
-  const [accountId, setAccountId] = useState("")
-  const [categoryId, setCategoryId] = useState("")
-  const [status, setStatus] = useState("COMPLETED")
+  const [amount, setAmount] = useState(initialTransaction ? String(Math.abs(initialTransaction.amount)) : "")
+  const [description, setDescription] = useState(initialTransaction?.description ?? "")
+  const [type, setType] = useState<"INCOME" | "EXPENSE">(initialTransaction?.type ?? "EXPENSE")
+  const [accountId, setAccountId] = useState(initialTransaction?.accountId ?? "")
+  const [categoryId, setCategoryId] = useState(initialTransaction?.categoryId ?? "")
+  const [status, setStatus] = useState(initialTransaction?.status ?? "COMPLETED")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
@@ -333,7 +351,7 @@ function TransactionForm({
     }
     setSaving(true)
     try {
-      const created = await apiCreateTransaction({
+      const body = {
         amount: numAmount,
         date: date.toISOString().slice(0, 10),
         description: description.trim(),
@@ -341,12 +359,23 @@ function TransactionForm({
         status: status as "COMPLETED" | "PENDING" | "SCHEDULED",
         accountId,
         categoryId,
-      })
-      if (created) {
-        onSuccess?.()
-        onClose()
+      }
+      if (isEdit && initialTransaction) {
+        const updated = await apiUpdateTransaction(initialTransaction.id, body)
+        if (updated) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError("Falha ao atualizar transação.")
+        }
       } else {
-        setError("Falha ao criar transação.")
+        const created = await apiCreateTransaction(body)
+        if (created) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError("Falha ao criar transação.")
+        }
       }
     } catch {
       setError("Erro ao conectar com o backend.")
@@ -558,7 +587,7 @@ function TransactionForm({
           Cancelar
         </Button>
         <Button type="submit" disabled={saving}>
-          {saving ? "Salvando…" : "Salvar Transação"}
+          {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Salvar Transação"}
         </Button>
       </div>
     </form>
@@ -581,6 +610,8 @@ type TransactionRow = {
   hasAttachment?: boolean
   installmentNumber: number | null
   totalInstallments: number | null
+  categoryId?: string
+  accountId?: string
 }
 
 export default function TransactionsPage() {
@@ -589,6 +620,7 @@ export default function TransactionsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState<TransactionRow | null>(null)
   const [apiTransactions, setApiTransactions] = useState<TransactionRow[]>([])
   const [apiAccounts, setApiAccounts] = useState<Array<{ id: string; name: string; type?: string }>>([])
   const [apiCategories, setApiCategories] = useState<Array<{ id: string; name: string; color?: string }>>([])
@@ -600,8 +632,10 @@ export default function TransactionsPage() {
       return
     }
     let cancelled = false
+    const from = dateRange?.from ? dateRange.from.toISOString().slice(0, 10) : undefined
+    const to = dateRange?.to ? dateRange.to.toISOString().slice(0, 10) : undefined
     Promise.all([
-      fetchTransactions(),
+      fetchTransactions({ from, to }),
       fetchAccounts(),
       fetchCategories(),
     ]).then(([txs, accs, cats]) => {
@@ -620,8 +654,10 @@ export default function TransactionsPage() {
           type: t.type,
           status: t.status,
           hasAttachment: false,
-          installmentNumber: null,
-          totalInstallments: null,
+          installmentNumber: (t as { installmentNumber?: number | null }).installmentNumber ?? null,
+          totalInstallments: (t as { totalInstallments?: number | null }).totalInstallments ?? null,
+          categoryId: t.categoryId ?? (t.category as { id?: string })?.id,
+          accountId: t.accountId ?? (t.account as { id?: string })?.id,
         }))
       )
       setApiAccounts(accs.map((a) => ({ id: a.id, name: a.name, type: (a as { type?: string }).type })))
@@ -629,11 +665,13 @@ export default function TransactionsPage() {
       setLoading(false)
     }).catch(() => setLoading(false))
     return () => { cancelled = true }
-  }, [])
+  }, [dateRange?.from?.toISOString(), dateRange?.to?.toISOString()])
 
   const refetchTransactions = () => {
     if (!hasApi) return
-    fetchTransactions().then((txs) =>
+    const from = dateRange?.from ? dateRange.from.toISOString().slice(0, 10) : undefined
+    const to = dateRange?.to ? dateRange.to.toISOString().slice(0, 10) : undefined
+    fetchTransactions({ from, to }).then((txs) =>
       setApiTransactions(
         txs.map((t) => ({
           id: t.id,
@@ -648,8 +686,10 @@ export default function TransactionsPage() {
           type: t.type,
           status: t.status,
           hasAttachment: false,
-          installmentNumber: null,
-          totalInstallments: null,
+          installmentNumber: (t as { installmentNumber?: number | null }).installmentNumber ?? null,
+          totalInstallments: (t as { totalInstallments?: number | null }).totalInstallments ?? null,
+          categoryId: t.categoryId ?? (t.category as { id?: string })?.id,
+          accountId: t.accountId ?? (t.account as { id?: string })?.id,
         }))
       )
     )
@@ -683,6 +723,26 @@ export default function TransactionsPage() {
     .filter((t) => t.type === "EXPENSE")
     .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 
+  const toFormInitial = (row: TransactionRow): TransactionFormInitial => ({
+    id: row.id,
+    amount: Math.abs(row.amount),
+    description: row.description,
+    type: row.type as "INCOME" | "EXPENSE",
+    accountId: row.accountId ?? listAccounts.find((a) => a.name === row.account.name)?.id ?? "",
+    categoryId: row.categoryId ?? listCategories.find((c) => c.name === row.category.name)?.id ?? "",
+    date: row.date,
+    status: row.status,
+    installmentNumber: row.installmentNumber,
+    totalInstallments: row.totalInstallments,
+  })
+
+  const handleDelete = async (row: TransactionRow) => {
+    if (!hasApi) return
+    if (!window.confirm("Excluir esta transação?")) return
+    const ok = await apiDeleteTransaction(row.id)
+    if (ok) refetchTransactions()
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -710,6 +770,22 @@ export default function TransactionsPage() {
               categories={listCategories}
               accounts={listAccounts}
             />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={editingTransaction !== null} onOpenChange={(open) => !open && setEditingTransaction(null)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Transação</DialogTitle>
+            </DialogHeader>
+            {editingTransaction && (
+              <TransactionForm
+                onClose={() => setEditingTransaction(null)}
+                onSuccess={() => { refetchTransactions(); setEditingTransaction(null) }}
+                categories={listCategories}
+                accounts={listAccounts}
+                initialTransaction={toFormInitial(editingTransaction)}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -818,12 +894,12 @@ export default function TransactionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {categories.map((cat) => (
+                {listCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.name}>
                     <div className="flex items-center gap-2">
                       <div
                         className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: cat.color }}
+                        style={{ backgroundColor: cat.color ?? "#6366f1" }}
                       />
                       {cat.name}
                     </div>
@@ -933,15 +1009,18 @@ export default function TransactionsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => hasApi && setEditingTransaction(transaction)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem disabled>
                             <FileText className="mr-2 h-4 w-4" />
                             Ver Anexo
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDelete(transaction)}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Excluir
                           </DropdownMenuItem>
@@ -959,7 +1038,7 @@ export default function TransactionsPage() {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Mostrando {filteredTransactions.length} de {transactions.length}{" "}
+          Mostrando {filteredTransactions.length} de {listTransactions.length}{" "}
           transações
         </p>
         <div className="flex items-center gap-2">

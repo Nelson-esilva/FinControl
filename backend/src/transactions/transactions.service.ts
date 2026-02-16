@@ -92,7 +92,19 @@ export class TransactionsService {
     });
   }
 
-  remove(id: string) {
-    return this.prisma.transaction.delete({ where: { id } });
+  async remove(id: string) {
+    const tx = await this.prisma.transaction.findFirstOrThrow({
+      where: { id, userId: USER_ID },
+    });
+    const balanceRevert = tx.type === TransactionType.INCOME
+      ? -Number(tx.amount)
+      : Number(tx.amount);
+    return this.prisma.$transaction(async (prismaTx) => {
+      await prismaTx.account.update({
+        where: { id: tx.accountId },
+        data: { currentBalance: { increment: balanceRevert } },
+      });
+      return prismaTx.transaction.delete({ where: { id } });
+    });
   }
 }

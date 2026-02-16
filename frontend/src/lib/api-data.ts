@@ -154,6 +154,39 @@ export async function createTransaction(body: {
   }
 }
 
+export async function updateTransaction(
+  id: string,
+  body: {
+    amount?: number
+    date?: string
+    description?: string
+    type?: string
+    status?: string
+    accountId?: string
+    categoryId?: string
+    installmentNumber?: number
+    totalInstallments?: number
+  }
+): Promise<ApiTransaction | null> {
+  if (!hasApi) return null
+  try {
+    const updated = await apiPut<ApiTransaction>(`/transactions/${id}`, body)
+    return updated
+  } catch {
+    return null
+  }
+}
+
+export async function deleteTransaction(id: string): Promise<boolean> {
+  if (!hasApi) return false
+  try {
+    await apiDelete(`/transactions/${id}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function createAccount(body: {
   name: string
   type: string
