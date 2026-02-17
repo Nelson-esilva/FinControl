@@ -15,20 +15,41 @@ const prisma_service_1 = require("../prisma/prisma.service");
 let UsersService = class UsersService {
     constructor(prisma) {
         this.prisma = prisma;
+        this.userSelect = {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            avatar: true,
+            role: true,
+            createdAt: true,
+            updatedAt: true,
+        };
     }
     create(dto, userId) {
         return this.prisma.user.create({
             data: { ...dto, id: userId },
+            select: this.userSelect,
         });
     }
     findAll() {
-        return this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+        return this.prisma.user.findMany({
+            orderBy: { createdAt: 'desc' },
+            select: this.userSelect,
+        });
     }
     findOne(id) {
-        return this.prisma.user.findUniqueOrThrow({ where: { id } });
+        return this.prisma.user.findUniqueOrThrow({
+            where: { id },
+            select: this.userSelect,
+        });
     }
     update(id, dto) {
-        return this.prisma.user.update({ where: { id }, data: dto });
+        return this.prisma.user.update({
+            where: { id },
+            data: dto,
+            select: this.userSelect,
+        });
     }
     remove(id) {
         return this.prisma.user.delete({ where: { id } });

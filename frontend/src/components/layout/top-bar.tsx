@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -37,12 +38,15 @@ const breadcrumbMap: Record<string, string> = {
   transactions: "Transações",
   wallet: "Carteira",
   budget: "Orçamento",
+  profile: "Perfil",
+  users: "Usuários",
   settings: "Configurações",
 }
 
 export function TopBar({ className }: TopBarProps) {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const { user, logout } = useAuth()
 
   // Generate breadcrumbs
   const pathSegments = pathname.split("/").filter(Boolean)
@@ -172,9 +176,8 @@ export function TopBar({ className }: TopBarProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
-                <AvatarImage src="/avatars/user.png" alt="User" />
                 <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-sm">
-                  JD
+                  {user?.name ? user.name.slice(0, 2).toUpperCase() : user?.email?.slice(0, 2).toUpperCase() ?? "?"}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -182,23 +185,28 @@ export function TopBar({ className }: TopBarProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">João da Silva</p>
-                <p className="text-xs text-muted-foreground">
-                  joao.silva@email.com
-                </p>
+                <p className="text-sm font-medium">{user?.name ?? "Usuário"}</p>
+                <p className="text-xs text-muted-foreground">{user?.email ?? ""}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
-              <User className="mr-2 h-4 w-4" />
-              Perfil
-            </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
-            </DropdownMenuItem>
+            <Link href="/profile">
+              <DropdownMenuItem className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                Perfil
+              </DropdownMenuItem>
+            </Link>
+            <Link href="/settings">
+              <DropdownMenuItem className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                Configurações
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 focus:text-rose-400 focus:bg-rose-500/10 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-500/20">
+            <DropdownMenuItem
+              className="cursor-pointer text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 focus:text-rose-400 focus:bg-rose-500/10 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-500/20"
+              onClick={() => logout()}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>

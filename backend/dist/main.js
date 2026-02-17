@@ -5,7 +5,7 @@ const common_1 = require("@nestjs/common");
 const path_1 = require("path");
 const fs_1 = require("fs");
 const app_module_1 = require("./app.module");
-const express_1 = require("express");
+const express = require("express");
 async function bootstrap() {
     const uploadsDir = (0, path_1.join)(process.cwd(), 'uploads');
     const avatarsDir = (0, path_1.join)(uploadsDir, 'avatars');
@@ -14,7 +14,7 @@ async function bootstrap() {
     if (!(0, fs_1.existsSync)(avatarsDir))
         (0, fs_1.mkdirSync)(avatarsDir, { recursive: true });
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
-    app.use('/uploads', express_1.default.static(uploadsDir));
+    app.use('/uploads', express.static(uploadsDir));
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         transform: true,

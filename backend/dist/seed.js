@@ -1,17 +1,32 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
+const bcrypt = require("bcrypt");
 const USER_ID = 'user-id';
+const SUPERUSER_EMAIL = 'nelson.silvaem@gmail.com';
 const prisma = new client_1.PrismaClient();
 async function main() {
+    const passwordHash = await bcrypt.hash('admin@123', 10);
+    const superuser = await prisma.user.upsert({
+        where: { email: SUPERUSER_EMAIL },
+        create: {
+            email: SUPERUSER_EMAIL,
+            password: passwordHash,
+            name: 'Nelson Silva',
+            role: 'SUPERUSER',
+        },
+        update: { password: passwordHash, name: 'Nelson Silva', role: 'SUPERUSER' },
+    });
     const user = await prisma.user.upsert({
         where: { id: USER_ID },
         create: {
             id: USER_ID,
             email: 'user@fincontrol.app',
+            password: await bcrypt.hash('user@123', 10),
             name: 'Usuário FinControl',
+            role: 'USER',
         },
-        update: {},
+        update: { password: await bcrypt.hash('user@123', 10) },
     });
     const countAccounts = await prisma.account.count({ where: { userId: user.id } });
     if (countAccounts === 0) {

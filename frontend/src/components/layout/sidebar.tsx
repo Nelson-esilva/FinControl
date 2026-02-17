@@ -17,12 +17,13 @@ import {
   Wallet,
   Target,
   Settings,
-  User,
+  Users,
   ChevronLeft,
   ChevronRight,
   PiggyBank,
 } from "lucide-react"
 import { useState } from "react"
+import { useAuth } from "@/contexts/auth-context"
 
 interface SidebarProps {
   className?: string
@@ -55,13 +56,7 @@ const navigation = [
   },
 ]
 
-const bottomNavigation = [
-  {
-    name: "Perfil",
-    href: "/profile",
-    icon: User,
-    description: "Seus dados e foto",
-  },
+const bottomNavigationBase = [
   {
     name: "Configurações",
     href: "/settings",
@@ -70,9 +65,23 @@ const bottomNavigation = [
   },
 ]
 
+const adminNavigation = [
+  {
+    name: "Usuários",
+    href: "/users",
+    icon: Users,
+    description: "Gerenciar usuários do sistema",
+  },
+]
+
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { isSuperUser } = useAuth()
+  const bottomNavigation = [
+    ...(isSuperUser ? adminNavigation : []),
+    ...bottomNavigationBase,
+  ]
 
   return (
     <TooltipProvider delayDuration={0}>

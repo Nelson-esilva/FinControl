@@ -10,6 +10,7 @@ export declare class UsersController {
         name: string | null;
         phone: string | null;
         avatar: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
         createdAt: Date;
         updatedAt: Date;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
@@ -19,6 +20,7 @@ export declare class UsersController {
         name: string | null;
         phone: string | null;
         avatar: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
         createdAt: Date;
         updatedAt: Date;
     }[]>;
@@ -28,6 +30,7 @@ export declare class UsersController {
         name: string | null;
         phone: string | null;
         avatar: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
         createdAt: Date;
         updatedAt: Date;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
@@ -37,6 +40,7 @@ export declare class UsersController {
         name: string | null;
         phone: string | null;
         avatar: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
         createdAt: Date;
         updatedAt: Date;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
@@ -46,9 +50,11 @@ export declare class UsersController {
     remove(id: string): import(".prisma/client").Prisma.Prisma__UserClient<{
         id: string;
         email: string;
+        password: string;
         name: string | null;
         phone: string | null;
         avatar: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
         createdAt: Date;
         updatedAt: Date;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;

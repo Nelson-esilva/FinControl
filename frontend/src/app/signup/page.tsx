@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { PiggyBank } from "lucide-react"
+import { PiggyBank, Eye, EyeOff } from "lucide-react"
+import { registerUser, hasApi } from "@/lib/api-data"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -16,6 +17,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -34,12 +37,30 @@ export default function SignupPage() {
     }
     setLoading(true)
     try {
-      // TODO: integrar com API de cadastro
-      await new Promise((r) => setTimeout(r, 800))
+      if (!hasApi) {
+        toast.error("Configure a conexão com o servidor para cadastrar.")
+        setLoading(false)
+        return
+      }
+      await registerUser({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      })
       toast.success("Conta criada com sucesso! Faça login para continuar.")
       router.push("/login")
-    } catch {
-      toast.error("Falha ao cadastrar. Tente novamente.")
+    } catch (e: unknown) {
+      let msg = "Falha ao cadastrar. Tente novamente."
+      if (e instanceof Error && e.message) {
+        try {
+          const parsed = JSON.parse(e.message) as { message?: string | string[] }
+          if (parsed?.message)
+            msg = Array.isArray(parsed.message) ? parsed.message[0] : String(parsed.message)
+        } catch {
+          if (e.message.length < 200) msg = e.message
+        }
+      }
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -93,27 +114,51 @@ export default function SignupPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mínimo 6 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar senha</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Repita a senha"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Repita a senha"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded"
+                    aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Cadastrando…" : "Cadastrar"}

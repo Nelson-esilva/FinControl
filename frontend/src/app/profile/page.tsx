@@ -13,12 +13,14 @@ import {
   updateProfile,
   uploadProfileAvatar,
   hasApi,
-  DEFAULT_USER_ID,
   type ApiProfile,
 } from "@/lib/api-data"
+import { useAuth } from "@/contexts/auth-context"
 import { apiUrl } from "@/lib/api"
 
 export default function ProfilePage() {
+  const { user: loggedUser } = useAuth()
+  const userId = loggedUser?.id ?? ""
   const [profile, setProfile] = useState<ApiProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -29,12 +31,12 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!hasApi) {
+    if (!hasApi || !userId) {
       setLoading(false)
       return
     }
     let cancelled = false
-    fetchProfile(DEFAULT_USER_ID).then((data) => {
+    fetchProfile(userId).then((data) => {
       if (cancelled) return
       setProfile(data)
       if (data) {
@@ -47,7 +49,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [userId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,7 +58,7 @@ export default function ProfilePage() {
       return
     }
     setSaving(true)
-    const updated = await updateProfile(DEFAULT_USER_ID, { name: name || undefined, email: email || undefined, phone: phone || undefined })
+    const updated = await updateProfile(userId, { name: name || undefined, email: email || undefined, phone: phone || undefined })
     setSaving(false)
     if (updated) {
       setProfile(updated)
@@ -70,7 +72,7 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file || !hasApi) return
     setUploading(true)
-    const result = await uploadProfileAvatar(DEFAULT_USER_ID, file)
+    const result = await uploadProfileAvatar(userId, file)
     setUploading(false)
     e.target.value = ""
     if (result?.avatar && profile) {
@@ -86,6 +88,21 @@ export default function ProfilePage() {
       ? profile.avatar
       : apiUrl(profile.avatar)
     : null
+
+  if (!userId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Perfil</h1>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Faça login para acessar seu perfil.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   if (!hasApi) {
     return (

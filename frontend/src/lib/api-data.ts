@@ -8,6 +8,15 @@ import { apiGet, apiPost, apiPut, apiDelete, apiUpload, hasApi } from "./api"
 /** ID do usuário atual (até implementar autenticação real). */
 export const DEFAULT_USER_ID = "user-id"
 
+/** Cadastra novo usuário. Em erro lança exceção (ex.: e-mail já cadastrado). */
+export async function registerUser(body: {
+  name: string
+  email: string
+  password: string
+}): Promise<void> {
+  await apiPost("/auth/register", body)
+}
+
 function toNum(v: unknown): number {
   if (typeof v === "number" && !Number.isNaN(v)) return v
   if (typeof v === "object" && v !== null && "toNumber" in (v as { toNumber?: () => number }))
@@ -305,7 +314,9 @@ export async function deleteBudget(id: string): Promise<boolean> {
   }
 }
 
-// ========== Perfil ==========
+// ========== Perfil e Usuários ==========
+
+export type ApiUserRole = "USER" | "SUPERUSER"
 
 export interface ApiProfile {
   id: string
@@ -313,8 +324,23 @@ export interface ApiProfile {
   name: string | null
   phone: string | null
   avatar: string | null
+  role?: ApiUserRole
   createdAt: string
   updatedAt: string
+}
+
+export interface ApiUserListItem extends ApiProfile {
+  role: ApiUserRole
+}
+
+export async function fetchUsers(): Promise<ApiUserListItem[] | null> {
+  if (!hasApi) return null
+  try {
+    const data = await apiGet<ApiUserListItem[]>("/users")
+    return Array.isArray(data) ? data : []
+  } catch {
+    return null
+  }
 }
 
 export async function fetchProfile(userId: string): Promise<ApiProfile | null> {

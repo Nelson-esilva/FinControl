@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
-import express from 'express';
+import * as express from 'express';
 
 async function bootstrap() {
   const uploadsDir = join(process.cwd(), 'uploads');
