@@ -7,6 +7,12 @@ export declare class DashboardController {
         monthlyIncome: number;
         monthlyExpense: number;
         monthlyBalance: number;
+        monthlySummary: {
+            month: string;
+            income: number;
+            expense: number;
+            balance: number;
+        }[];
         recentTransactions: {
             id: string;
             description: string;

@@ -18,6 +18,7 @@ export interface DashboardData {
   monthlyIncome: number
   monthlyExpense: number
   monthlyBalance: number
+  monthlySummary?: Array<{ month: string; income: number; expense: number; balance: number }>
   recentTransactions: Array<{
     id: string
     description: string

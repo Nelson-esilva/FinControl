@@ -280,7 +280,7 @@ function BudgetForm({
       return
     }
     if (!hasApi) {
-      setError("API não configurada.")
+      setError("Não foi possível conectar. Verifique as configurações do aplicativo.")
       return
     }
     setSaving(true)
@@ -312,7 +312,7 @@ function BudgetForm({
         }
       }
     } catch {
-      setError("Erro ao conectar com o backend.")
+      setError("Não foi possível conectar ao servidor. Tente novamente mais tarde.")
     } finally {
       setSaving(false)
     }
@@ -736,7 +736,7 @@ export default function BudgetPage() {
           <p className="text-muted-foreground col-span-full py-8 text-center">
             {hasApi
               ? "Nenhum orçamento. Clique em \"Novo Orçamento\" para criar."
-              : "Conecte o backend (NEXT_PUBLIC_API_URL) para gerenciar orçamentos."}
+              : "Configure a conexão com o servidor para gerenciar orçamentos."}
           </p>
         ) : (
           listBudgets.map((budget) => (

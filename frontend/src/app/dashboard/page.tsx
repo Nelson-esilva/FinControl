@@ -36,92 +36,6 @@ import {
 } from "recharts"
 
 // ============================================
-// MOCK DATA
-// ============================================
-
-const monthlyData = [
-  { month: "Jan", income: 8500, expense: 6200, balance: 2300 },
-  { month: "Fev", income: 9200, expense: 5800, balance: 3400 },
-  { month: "Mar", income: 8800, expense: 7100, balance: 1700 },
-  { month: "Abr", income: 9500, expense: 6400, balance: 3100 },
-  { month: "Mai", income: 10200, expense: 6900, balance: 3300 },
-  { month: "Jun", income: 9800, expense: 7200, balance: 2600 },
-  { month: "Jul", income: 10500, expense: 6800, balance: 3700 },
-  { month: "Ago", income: 11000, expense: 7500, balance: 3500 },
-  { month: "Set", income: 10800, expense: 7100, balance: 3700 },
-  { month: "Out", income: 11500, expense: 7800, balance: 3700 },
-  { month: "Nov", income: 11200, expense: 7600, balance: 3600 },
-  { month: "Dez", income: 12000, expense: 8200, balance: 3800 },
-]
-
-const categoryData = [
-  { name: "Alimentação", value: 2450, color: "#f43f5e" },
-  { name: "Transporte", value: 1200, color: "#f59e0b" },
-  { name: "Moradia", value: 2800, color: "#8b5cf6" },
-  { name: "Lazer", value: 850, color: "#06b6d4" },
-  { name: "Saúde", value: 650, color: "#10b981" },
-  { name: "Outros", value: 250, color: "#6b7280" },
-]
-
-const recentTransactions = [
-  {
-    id: "1",
-    description: "Supermercado Extra",
-    category: "Alimentação",
-    categoryColor: "#f43f5e",
-    account: "Nubank",
-    date: new Date(Date.now() - 1000 * 60 * 30), // 30 min ago
-    amount: -450.5,
-    type: "expense",
-    hasAttachment: true,
-  },
-  {
-    id: "2",
-    description: "Salário Mensal",
-    category: "Renda",
-    categoryColor: "#10b981",
-    account: "Itaú",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    amount: 8500.0,
-    type: "income",
-    hasAttachment: false,
-  },
-  {
-    id: "3",
-    description: "Uber - Viagem",
-    category: "Transporte",
-    categoryColor: "#f59e0b",
-    account: "Nubank",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
-    amount: -28.9,
-    type: "expense",
-    hasAttachment: false,
-  },
-  {
-    id: "4",
-    description: "Netflix Assinatura",
-    category: "Lazer",
-    categoryColor: "#06b6d4",
-    account: "Nubank",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    amount: -39.9,
-    type: "expense",
-    hasAttachment: true,
-  },
-  {
-    id: "5",
-    description: "Freelance Projeto",
-    category: "Renda Extra",
-    categoryColor: "#10b981",
-    account: "Itaú",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
-    amount: 2500.0,
-    type: "income",
-    hasAttachment: true,
-  },
-]
-
-// ============================================
 // KPI CARDS COMPONENT
 // ============================================
 
@@ -176,10 +90,17 @@ function KPICard({ title, value, change, icon: Icon, format = "currency" }: KPIC
 // CHART COMPONENTS
 // ============================================
 
-function BalanceAreaChart() {
+function BalanceAreaChart({ data }: { data: Array<{ month: string; income: number; expense: number; balance: number }> }) {
+  if (!data?.length) {
+    return (
+      <div className="flex h-[350px] items-center justify-center text-muted-foreground text-sm">
+        Cadastre transações para ver aqui o histórico de receitas e despesas dos últimos meses.
+      </div>
+    )
+  }
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+      <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -266,16 +187,23 @@ function BalanceAreaChart() {
   )
 }
 
-function CategoryDonutChart({ data }: { data?: Array<{ name: string; value: number; color: string }> }) {
-  const chartData = data?.length ? data : categoryData
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0)
+function CategoryDonutChart({ data }: { data: Array<{ name: string; value: number; color: string }> }) {
+  const total = data.reduce((acc, curr) => acc + curr.value, 0)
+
+  if (!data.length) {
+    return (
+      <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
+        Nenhum gasto registrado neste mês. Suas despesas por categoria aparecerão aqui.
+      </div>
+    )
+  }
 
   return (
     <div className="relative">
       <ResponsiveContainer width="100%" height={280}>
         <PieChart>
           <Pie
-            data={chartData}
+            data={data}
             cx="50%"
             cy="50%"
             innerRadius={70}
@@ -283,7 +211,7 @@ function CategoryDonutChart({ data }: { data?: Array<{ name: string; value: numb
             paddingAngle={2}
             dataKey="value"
           >
-            {chartData.map((entry, index) => (
+            {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
@@ -342,12 +270,13 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   }, [])
 
-  const totalBalance = apiData?.totalBalance ?? 45680.5
-  const monthlyIncome = apiData?.monthlyIncome ?? 12000
-  const monthlyExpense = apiData?.monthlyExpense ?? 8200
-  const monthlyBalance = apiData?.monthlyBalance ?? 3800
-  const recentList = apiData?.recentTransactions?.length ? apiData.recentTransactions : recentTransactions
-  const categoryChartData = apiData?.categorySummary?.length ? apiData.categorySummary : categoryData
+  const totalBalance = apiData?.totalBalance ?? 0
+  const monthlyIncome = apiData?.monthlyIncome ?? 0
+  const monthlyExpense = apiData?.monthlyExpense ?? 0
+  const monthlyBalance = apiData?.monthlyBalance ?? 0
+  const monthlyChartData = apiData?.monthlySummary ?? []
+  const recentList = apiData?.recentTransactions ?? []
+  const categoryChartData = apiData?.categorySummary ?? []
 
   return (
     <div className="space-y-6">
@@ -436,7 +365,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <BalanceAreaChart />
+            <BalanceAreaChart data={monthlyChartData} />
           </CardContent>
         </Card>
 
@@ -450,6 +379,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <CategoryDonutChart data={categoryChartData} />
+            {categoryChartData.length > 0 && (
             <div className="mt-4 space-y-2">
               {categoryChartData.map((category) => (
                 <div
@@ -469,6 +399,7 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -490,66 +421,71 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentList.map((transaction) => {
-                const date = typeof transaction.date === "string" ? new Date(transaction.date) : transaction.date
-                return (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar
-                      className="h-10 w-10"
-                      style={{
-                        backgroundColor: `${(transaction as { categoryColor?: string }).categoryColor ?? "#6366f1"}20`,
-                      }}
+              {recentList.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Suas últimas movimentações aparecerão aqui.</p>
+              ) : (
+                recentList.map((transaction) => {
+                  const date = typeof transaction.date === "string" ? new Date(transaction.date) : transaction.date
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
                     >
-                      <AvatarFallback
-                        style={{ color: (transaction as { categoryColor?: string }).categoryColor ?? "#6366f1" }}
-                      >
-                        {transaction.type === "income" ? (
-                          <ArrowUpRight className="h-4 w-4" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4" />
-                        )}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">
-                        {transaction.description}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span
-                          className="inline-flex items-center gap-1"
-                          style={{ color: (transaction as { categoryColor?: string }).categoryColor ?? "#6366f1" }}
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          className="h-10 w-10"
+                          style={{
+                            backgroundColor: `${(transaction as { categoryColor?: string }).categoryColor ?? "#6366f1"}20`,
+                          }}
                         >
-                          <div
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: (transaction as { categoryColor?: string }).categoryColor ?? "#6366f1" }}
-                          />
-                          {transaction.category}
+                          <AvatarFallback
+                            style={{ color: (transaction as { categoryColor?: string }).categoryColor ?? "#6366f1" }}
+                          >
+                            {transaction.type === "income" ? (
+                              <ArrowUpRight className="h-4 w-4" />
+                            ) : (
+                              <ArrowDownRight className="h-4 w-4" />
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">
+                            {transaction.description}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span
+                              className="inline-flex items-center gap-1"
+                              style={{ color: (transaction as { categoryColor?: string }).categoryColor ?? "#6366f1" }}
+                            >
+                              <div
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ backgroundColor: (transaction as { categoryColor?: string }).categoryColor ?? "#6366f1" }}
+                              />
+                              {transaction.category}
+                            </span>
+                            <span>•</span>
+                            <span>{transaction.account}</span>
+                            <span>•</span>
+                            <span>{formatRelativeDate(date)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`font-medium ${
+                            transaction.type === "income"
+                              ? "text-emerald-600"
+                              : "text-rose-600"
+                          }`}
+                        >
+                          {transaction.type === "income" ? "+" : ""}
+                          {formatCurrency(transaction.amount)}
                         </span>
-                        <span>•</span>
-                        <span>{transaction.account}</span>
-                        <span>•</span>
-                        <span>{formatRelativeDate(date)}</span>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`font-medium ${
-                        transaction.type === "income"
-                          ? "text-emerald-600"
-                          : "text-rose-600"
-                      }`}
-                    >
-                      {transaction.type === "income" ? "+" : ""}
-                      {formatCurrency(transaction.amount)}
-                    </span>
-                  </div>
-                </div>
-              );})}
+                  )
+                })
+              )}
             </div>
           </CardContent>
         </Card>

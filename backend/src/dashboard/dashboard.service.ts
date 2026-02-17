@@ -59,11 +59,44 @@ export class DashboardService {
       });
     const categorySummary = Array.from(categoryMap.values());
 
+    // Últimos 12 meses: receita, despesa e saldo por mês
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const last12MonthsTxs = await this.prisma.transaction.findMany({
+      where: { userId: USER_ID, date: { gte: twelveMonthsAgo }, status: 'COMPLETED' },
+    });
+    const byMonth = new Map<string, { income: number; expense: number }>();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      byMonth.set(key, { income: 0, expense: 0 });
+    }
+    last12MonthsTxs.forEach((t) => {
+      const key = `${t.date.getFullYear()}-${t.date.getMonth()}`;
+      const cur = byMonth.get(key);
+      if (cur) {
+        if (t.type === TransactionType.INCOME) cur.income += Number(t.amount);
+        else cur.expense += Number(t.amount);
+      }
+    });
+    const monthlySummary = Array.from(byMonth.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v], idx) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - 11 + idx, 1);
+        return {
+          month: monthNames[d.getMonth()],
+          income: v.income,
+          expense: v.expense,
+          balance: v.income - v.expense,
+        };
+      });
+
     return {
       totalBalance,
       monthlyIncome,
       monthlyExpense,
       monthlyBalance: monthlyIncome - monthlyExpense,
+      monthlySummary,
       recentTransactions: recentTransactions.map((t) => ({
         id: t.id,
         description: t.description,

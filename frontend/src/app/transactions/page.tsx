@@ -192,7 +192,7 @@ function TransactionForm({
       return
     }
     if (!hasApi) {
-      setError("API não configurada. Defina NEXT_PUBLIC_API_URL.")
+      setError("Não foi possível conectar. Verifique as configurações do aplicativo.")
       return
     }
     setSaving(true)
@@ -224,7 +224,7 @@ function TransactionForm({
         }
       }
     } catch {
-      setError("Erro ao conectar com o backend.")
+      setError("Não foi possível conectar ao servidor. Tente novamente mais tarde.")
     } finally {
       setSaving(false)
     }
@@ -791,7 +791,7 @@ export default function TransactionsPage() {
               ) : listTransactions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {hasApi ? "Nenhuma transação. Clique em \"Nova Transação\" para criar." : "Conecte o backend (NEXT_PUBLIC_API_URL) para ver e criar transações."}
+                    {hasApi ? "Nenhuma transação cadastrada. Clique em \"Nova Transação\" para registrar a primeira." : "Configure a conexão com o servidor para ver e criar transações."}
                   </TableCell>
                 </TableRow>
               ) : filteredTransactions.length === 0 ? (

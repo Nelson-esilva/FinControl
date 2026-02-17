@@ -179,7 +179,7 @@ function AccountForm({
       return
     }
     if (!hasApi) {
-      setError("Conecte o backend (NEXT_PUBLIC_API_URL).")
+      setError("Não foi possível conectar. Verifique as configurações do aplicativo.")
       return
     }
     setSaving(true)
@@ -213,7 +213,7 @@ function AccountForm({
         }
       }
     } catch {
-      setError("Erro ao conectar com o backend.")
+      setError("Não foi possível conectar ao servidor. Tente novamente mais tarde.")
     } finally {
       setSaving(false)
     }
@@ -448,7 +448,7 @@ export default function WalletPage() {
               <p className="text-muted-foreground col-span-full py-8 text-center">Carregando…</p>
             ) : filteredAccounts.length === 0 ? (
               <p className="text-muted-foreground col-span-full py-8 text-center">
-                {hasApi ? "Nenhuma conta. Clique em \"Nova Conta\" para criar." : "Conecte o backend (NEXT_PUBLIC_API_URL) para gerenciar contas."}
+                {hasApi ? "Nenhuma conta cadastrada. Clique em \"Nova Conta\" para criar a primeira." : "Configure a conexão com o servidor para gerenciar suas contas."}
               </p>
             ) : (
               filteredAccounts.map((account) => (
