@@ -11,12 +11,17 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const path_1 = require("path");
 const users_service_1 = require("./users.service");
 const create_user_dto_1 = require("./dto/create-user.dto");
 const update_user_dto_1 = require("./dto/update-user.dto");
+const AVATAR_DIR = 'uploads/avatars';
 let UsersController = class UsersController {
     constructor(users) {
         this.users = users;
@@ -32,6 +37,13 @@ let UsersController = class UsersController {
     }
     update(id, dto) {
         return this.users.update(id, dto);
+    }
+    async uploadAvatar(id, file) {
+        if (!file)
+            throw new common_1.BadRequestException('Nenhum arquivo enviado');
+        const avatarUrl = `/uploads/avatars/${file.filename}`;
+        await this.users.update(id, { avatar: avatarUrl });
+        return { avatar: avatarUrl };
     }
     remove(id) {
         return this.users.remove(id);
@@ -66,6 +78,29 @@ __decorate([
     __metadata("design:paramtypes", [String, update_user_dto_1.UpdateUserDto]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "update", null);
+__decorate([
+    (0, common_1.Post)(':id/avatar'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('avatar', {
+        storage: (0, multer_1.diskStorage)({
+            destination: AVATAR_DIR,
+            filename: (req, file, cb) => {
+                const id = req.params.id;
+                const ext = (0, path_1.extname)(file.originalname) || '.jpg';
+                cb(null, `${id}-${Date.now()}${ext}`);
+            },
+        }),
+        limits: { fileSize: 5 * 1024 * 1024 },
+        fileFilter: (_, file, cb) => {
+            const allowed = /\.(jpe?g|png|webp|gif)$/i.test(file.originalname);
+            cb(null, allowed);
+        },
+    })),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, typeof (_b = typeof Express !== "undefined" && (_a = Express.Multer) !== void 0 && _a.File) === "function" ? _b : Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "uploadAvatar", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),

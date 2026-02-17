@@ -5,8 +5,8 @@ export declare class CategoriesController {
     private readonly categories;
     constructor(categories: CategoriesService);
     create(dto: CreateCategoryDto): import(".prisma/client").Prisma.Prisma__CategoryClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.TransactionType;
@@ -16,8 +16,8 @@ export declare class CategoriesController {
         isDefault: boolean;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     findAll(type?: 'INCOME' | 'EXPENSE'): import(".prisma/client").Prisma.PrismaPromise<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.TransactionType;
@@ -27,8 +27,8 @@ export declare class CategoriesController {
         isDefault: boolean;
     }[]>;
     findOne(id: string): import(".prisma/client").Prisma.Prisma__CategoryClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.TransactionType;
@@ -38,8 +38,8 @@ export declare class CategoriesController {
         isDefault: boolean;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     update(id: string, dto: UpdateCategoryDto): import(".prisma/client").Prisma.Prisma__CategoryClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.TransactionType;
@@ -49,8 +49,8 @@ export declare class CategoriesController {
         isDefault: boolean;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     remove(id: string): import(".prisma/client").Prisma.Prisma__CategoryClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.TransactionType;

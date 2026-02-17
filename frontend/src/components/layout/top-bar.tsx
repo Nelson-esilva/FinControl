@@ -198,7 +198,7 @@ export function TopBar({ className }: TopBarProps) {
               Configurações
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive">
+            <DropdownMenuItem className="cursor-pointer text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 focus:text-rose-400 focus:bg-rose-500/10 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-500/20">
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>

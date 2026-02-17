@@ -17,6 +17,7 @@ import {
   Wallet,
   Target,
   Settings,
+  User,
   ChevronLeft,
   ChevronRight,
   PiggyBank,
@@ -55,6 +56,12 @@ const navigation = [
 ]
 
 const bottomNavigation = [
+  {
+    name: "Perfil",
+    href: "/profile",
+    icon: User,
+    description: "Seus dados e foto",
+  },
   {
     name: "Configurações",
     href: "/settings",

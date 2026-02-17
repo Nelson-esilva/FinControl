@@ -5,8 +5,8 @@ export declare class AccountsController {
     private readonly accounts;
     constructor(accounts: AccountsService);
     create(dto: CreateAccountDto): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.AccountType;
@@ -20,8 +20,8 @@ export declare class AccountsController {
         userId: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     findAll(): import(".prisma/client").Prisma.PrismaPromise<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.AccountType;
@@ -35,8 +35,8 @@ export declare class AccountsController {
         userId: string;
     }[]>;
     findOne(id: string): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.AccountType;
@@ -50,8 +50,8 @@ export declare class AccountsController {
         userId: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     update(id: string, dto: UpdateAccountDto): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.AccountType;
@@ -65,8 +65,8 @@ export declare class AccountsController {
         userId: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     remove(id: string): import(".prisma/client").Prisma.Prisma__AccountClient<{
-        name: string;
         id: string;
+        name: string;
         createdAt: Date;
         updatedAt: Date;
         type: import(".prisma/client").$Enums.AccountType;

@@ -7,6 +7,14 @@ export declare class DashboardService {
         monthlyIncome: number;
         monthlyExpense: number;
         monthlyBalance: number;
+        monthlyTransactionCount: number;
+        previousMonthTransactionCount: number;
+        activeAccountsCount: number;
+        activeAccountsByType: Record<string, number>;
+        savingsGoalPlanned: number;
+        savingsGoalAchievedPercent: number;
+        totalBudgetLimit: number;
+        spendingLimitUsedPercent: number;
         monthlySummary: {
             month: string;
             income: number;

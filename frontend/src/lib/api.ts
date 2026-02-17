@@ -41,4 +41,13 @@ export async function apiDelete(path: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export const hasApi = Boolean(API_URL);

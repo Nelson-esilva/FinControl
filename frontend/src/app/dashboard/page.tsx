@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   TrendingUp,
@@ -249,6 +249,29 @@ function CategoryDonutChart({ data }: { data: Array<{ name: string; value: numbe
       </div>
     </div>
   )
+}
+
+const ACCOUNT_TYPE_LABELS: Record<string, { one: string; many: string }> = {
+  CHECKING: { one: "banco", many: "bancos" },
+  SAVINGS: { one: "poupança", many: "poupanças" },
+  INVESTMENT: { one: "investimento", many: "investimentos" },
+  CREDIT_CARD: { one: "cartão", many: "cartões" },
+  WALLET: { one: "carteira", many: "carteiras" },
+  OTHER: { one: "outro", many: "outros" },
+}
+
+function formatAccountsByType(byType?: Record<string, number>): string {
+  if (!byType || Object.keys(byType).length === 0) return "—"
+  const parts: string[] = []
+  const order = ["CHECKING", "SAVINGS", "INVESTMENT", "CREDIT_CARD", "WALLET", "OTHER"]
+  for (const type of order) {
+    const n = byType[type]
+    if (n && n > 0) {
+      const labels = ACCOUNT_TYPE_LABELS[type] ?? { one: type.toLowerCase(), many: type.toLowerCase() }
+      parts.push(n === 1 ? `1 ${labels.one}` : `${n} ${labels.many}`)
+    }
+  }
+  return parts.join(", ") || "—"
 }
 
 // ============================================
@@ -502,26 +525,50 @@ export default function DashboardPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Meta de Economia</span>
-                <span className="font-medium">75% atingida</span>
+                <span className="font-medium">
+                  {monthlyIncome > 0 && (apiData?.savingsGoalPlanned ?? 0) > 0
+                    ? `${Math.round(apiData?.savingsGoalAchievedPercent ?? 0)}% atingida`
+                    : "—"}
+                </span>
               </div>
-              <Progress value={75} className="h-2" />
+              <Progress
+                value={Math.min(100, apiData?.savingsGoalAchievedPercent ?? 0)}
+                className="h-2"
+              />
               <p className="text-xs text-muted-foreground">
-                Você economizou R$ 3.800 dos R$ 5.000 planejados
+                {monthlyIncome > 0 ? (
+                  <>
+                    Você economizou {formatCurrency(monthlyBalance)} dos{" "}
+                    {formatCurrency(apiData?.savingsGoalPlanned ?? 0)} planejados (20% da renda)
+                  </>
+                ) : (
+                  "Cadastre receitas para acompanhar sua meta de economia."
+                )}
               </p>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Limite de Gastos</span>
-                <span className="font-medium">82% utilizado</span>
+                <span className="font-medium">
+                  {(apiData?.totalBudgetLimit ?? 0) > 0
+                    ? `${Math.round(apiData?.spendingLimitUsedPercent ?? 0)}% utilizado`
+                    : "—"}
+                </span>
               </div>
-              <Progress 
-                value={82} 
+              <Progress
+                value={Math.min(100, apiData?.spendingLimitUsedPercent ?? 0)}
                 className="h-2"
                 indicatorClassName="bg-amber-500"
               />
               <p className="text-xs text-muted-foreground">
-                R$ 8.200 de R$ 10.000 disponíveis
+                {(apiData?.totalBudgetLimit ?? 0) > 0 ? (
+                  <>
+                    {formatCurrency(monthlyExpense)} de {formatCurrency(apiData?.totalBudgetLimit ?? 0)} disponíveis
+                  </>
+                ) : (
+                  "Defina orçamentos por categoria para acompanhar o limite de gastos."
+                )}
               </p>
             </div>
 
@@ -531,16 +578,31 @@ export default function DashboardPage() {
                   <Receipt className="h-4 w-4" />
                   <span className="text-xs">Total de Transações</span>
                 </div>
-                <p className="text-2xl font-bold">47</p>
-                <p className="text-xs text-emerald-600">+12 vs mês anterior</p>
+                <p className="text-2xl font-bold">{apiData?.monthlyTransactionCount ?? 0}</p>
+                {typeof apiData?.previousMonthTransactionCount === "number" && (
+                  <p
+                    className={
+                      (apiData.monthlyTransactionCount ?? 0) >= (apiData.previousMonthTransactionCount ?? 0)
+                        ? "text-xs text-emerald-600"
+                        : "text-xs text-rose-600"
+                    }
+                  >
+                    {(apiData.monthlyTransactionCount ?? 0) - (apiData.previousMonthTransactionCount ?? 0) >= 0
+                      ? "+"
+                      : ""}
+                    {(apiData.monthlyTransactionCount ?? 0) - (apiData.previousMonthTransactionCount ?? 0)} vs mês anterior
+                  </p>
+                )}
               </div>
               <div className="rounded-lg bg-muted/50 p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <CreditCard className="h-4 w-4" />
                   <span className="text-xs">Contas Ativas</span>
                 </div>
-                <p className="text-2xl font-bold">5</p>
-                <p className="text-xs text-muted-foreground">3 bancos, 2 cartões</p>
+                <p className="text-2xl font-bold">{apiData?.activeAccountsCount ?? 0}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatAccountsByType(apiData?.activeAccountsByType)}
+                </p>
               </div>
             </div>
           </CardContent>

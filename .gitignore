@@ -9,6 +9,7 @@ node_modules/
 # Backend (NestJS)
 backend/dist/
 backend/node_modules/
+backend/uploads/
 
 # Frontend (Next.js)
 frontend/.next/

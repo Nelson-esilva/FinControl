@@ -3,7 +3,10 @@
  * Usado quando NEXT_PUBLIC_API_URL está definido.
  */
 
-import { apiGet, apiPost, apiPut, apiDelete, hasApi } from "./api"
+import { apiGet, apiPost, apiPut, apiDelete, apiUpload, hasApi } from "./api"
+
+/** ID do usuário atual (até implementar autenticação real). */
+export const DEFAULT_USER_ID = "user-id"
 
 function toNum(v: unknown): number {
   if (typeof v === "number" && !Number.isNaN(v)) return v
@@ -18,6 +21,14 @@ export interface DashboardData {
   monthlyIncome: number
   monthlyExpense: number
   monthlyBalance: number
+  monthlyTransactionCount?: number
+  previousMonthTransactionCount?: number
+  activeAccountsCount?: number
+  activeAccountsByType?: Record<string, number>
+  savingsGoalPlanned?: number
+  savingsGoalAchievedPercent?: number
+  totalBudgetLimit?: number
+  spendingLimitUsedPercent?: number
   monthlySummary?: Array<{ month: string; income: number; expense: number; balance: number }>
   recentTransactions: Array<{
     id: string
@@ -291,6 +302,53 @@ export async function deleteBudget(id: string): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+// ========== Perfil ==========
+
+export interface ApiProfile {
+  id: string
+  email: string
+  name: string | null
+  phone: string | null
+  avatar: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchProfile(userId: string): Promise<ApiProfile | null> {
+  if (!hasApi) return null
+  try {
+    const data = await apiGet<ApiProfile>(`/users/${userId}`)
+    return data
+  } catch {
+    return null
+  }
+}
+
+export async function updateProfile(
+  userId: string,
+  body: { name?: string; email?: string; phone?: string }
+): Promise<ApiProfile | null> {
+  if (!hasApi) return null
+  try {
+    const updated = await apiPut<ApiProfile>(`/users/${userId}`, body)
+    return updated
+  } catch {
+    return null
+  }
+}
+
+export async function uploadProfileAvatar(userId: string, file: File): Promise<{ avatar: string } | null> {
+  if (!hasApi) return null
+  try {
+    const formData = new FormData()
+    formData.append("avatar", file)
+    const result = await apiUpload<{ avatar: string }>(`/users/${userId}/avatar`, formData)
+    return result
+  } catch {
+    return null
   }
 }
 

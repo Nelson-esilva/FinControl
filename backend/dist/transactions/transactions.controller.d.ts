@@ -25,8 +25,8 @@ export declare class TransactionsController {
     }>;
     findAll(type?: TransactionType, accountId?: string, categoryId?: string, from?: string, to?: string): import(".prisma/client").Prisma.PrismaPromise<({
         account: {
-            name: string;
             id: string;
+            name: string;
             createdAt: Date;
             updatedAt: Date;
             type: import(".prisma/client").$Enums.AccountType;
@@ -40,8 +40,8 @@ export declare class TransactionsController {
             userId: string;
         };
         category: {
-            name: string;
             id: string;
+            name: string;
             createdAt: Date;
             updatedAt: Date;
             type: import(".prisma/client").$Enums.TransactionType;
@@ -70,8 +70,8 @@ export declare class TransactionsController {
     })[]>;
     findOne(id: string): import(".prisma/client").Prisma.Prisma__TransactionClient<{
         account: {
-            name: string;
             id: string;
+            name: string;
             createdAt: Date;
             updatedAt: Date;
             type: import(".prisma/client").$Enums.AccountType;
@@ -85,8 +85,8 @@ export declare class TransactionsController {
             userId: string;
         };
         category: {
-            name: string;
             id: string;
+            name: string;
             createdAt: Date;
             updatedAt: Date;
             type: import(".prisma/client").$Enums.TransactionType;

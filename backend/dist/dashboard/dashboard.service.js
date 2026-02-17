@@ -22,7 +22,9 @@ let DashboardService = class DashboardService {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        const [accounts, transactions, recentTransactions] = await Promise.all([
+        const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        const [accounts, transactions, recentTransactions, previousMonthCount, budgets] = await Promise.all([
             this.prisma.account.findMany({
                 where: { userId: USER_ID, isActive: true },
             }),
@@ -39,6 +41,21 @@ let DashboardService = class DashboardService {
                 include: { account: true, category: true },
                 orderBy: { date: 'desc' },
                 take: 10,
+            }),
+            this.prisma.transaction.count({
+                where: {
+                    userId: USER_ID,
+                    date: { gte: startOfPrevMonth, lte: endOfPrevMonth },
+                    status: 'COMPLETED',
+                },
+            }),
+            this.prisma.budget.findMany({
+                where: {
+                    userId: USER_ID,
+                    isActive: true,
+                    startDate: { lte: endOfMonth },
+                    endDate: { gte: startOfMonth },
+                },
             }),
         ]);
         const totalBalance = accounts.reduce((sum, a) => sum + Number(a.currentBalance), 0);
@@ -94,11 +111,29 @@ let DashboardService = class DashboardService {
                 balance: v.income - v.expense,
             };
         });
+        const monthlyBalance = monthlyIncome - monthlyExpense;
+        const savingsGoalPercent = 20;
+        const savingsGoalPlanned = (monthlyIncome * savingsGoalPercent) / 100;
+        const savingsGoalAchievedPercent = savingsGoalPlanned > 0 ? Math.min(100, (monthlyBalance / savingsGoalPlanned) * 100) : 0;
+        const totalBudgetLimit = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
+        const spendingLimitUsedPercent = totalBudgetLimit > 0 ? Math.min(100, (monthlyExpense / totalBudgetLimit) * 100) : 0;
+        const accountTypeCount = accounts.reduce((acc, a) => {
+            acc[a.type] = (acc[a.type] ?? 0) + 1;
+            return acc;
+        }, {});
         return {
             totalBalance,
             monthlyIncome,
             monthlyExpense,
-            monthlyBalance: monthlyIncome - monthlyExpense,
+            monthlyBalance,
+            monthlyTransactionCount: transactions.length,
+            previousMonthTransactionCount: previousMonthCount,
+            activeAccountsCount: accounts.length,
+            activeAccountsByType: accountTypeCount,
+            savingsGoalPlanned,
+            savingsGoalAchievedPercent,
+            totalBudgetLimit,
+            spendingLimitUsedPercent,
             monthlySummary,
             recentTransactions: recentTransactions.map((t) => ({
                 id: t.id,
