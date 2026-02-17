@@ -13,20 +13,42 @@ export class BudgetsService {
   create(dto: CreateBudgetDto) {
     return this.prisma.budget.create({
       data: {
-        ...dto,
         userId: USER_ID,
+        categoryId: dto.categoryId,
         amount: new Decimal(dto.amount),
         period: dto.period ?? 'MONTHLY',
+        startDate: new Date(dto.startDate),
+        endDate: new Date(dto.endDate),
+        alertAt80: dto.alertAt80 ?? true,
+        alertAt100: dto.alertAt100 ?? true,
+        isActive: dto.isActive ?? true,
       },
+      include: { category: true },
     });
   }
 
-  findAll() {
-    return this.prisma.budget.findMany({
+  async findAll() {
+    const budgets = await this.prisma.budget.findMany({
       where: { userId: USER_ID },
       include: { category: true },
       orderBy: { startDate: 'desc' },
     });
+    const withSpent = await Promise.all(
+      budgets.map(async (b: (typeof budgets)[number]) => {
+        const sum = await this.prisma.transaction.aggregate({
+          where: {
+            userId: USER_ID,
+            categoryId: b.categoryId,
+            type: 'EXPENSE',
+            date: { gte: b.startDate, lte: b.endDate },
+          },
+          _sum: { amount: true },
+        });
+        const spent = Number(sum._sum.amount ?? 0);
+        return { ...b, spent };
+      }),
+    );
+    return withSpent;
   }
 
   findOne(id: string) {
@@ -39,7 +61,13 @@ export class BudgetsService {
   update(id: string, dto: UpdateBudgetDto) {
     const data: Record<string, unknown> = { ...dto };
     if (dto.amount != null) data.amount = new Decimal(dto.amount);
-    return this.prisma.budget.update({ where: { id }, data });
+    if (dto.startDate) data.startDate = new Date(dto.startDate);
+    if (dto.endDate) data.endDate = new Date(dto.endDate);
+    return this.prisma.budget.update({
+      where: { id },
+      data,
+      include: { category: true },
+    });
   }
 
   remove(id: string) {

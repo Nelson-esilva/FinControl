@@ -78,6 +78,9 @@ export interface ApiBudget {
   endDate: string
   categoryId: string
   category?: ApiCategory
+  spent?: number
+  alertAt80?: boolean
+  alertAt100?: boolean
 }
 
 export async function fetchTransactions(params?: {
@@ -204,6 +207,29 @@ export async function createAccount(body: {
   }
 }
 
+export async function updateAccount(
+  id: string,
+  body: { name?: string; type?: string; color?: string; creditLimit?: number; dueDate?: number }
+): Promise<ApiAccount | null> {
+  if (!hasApi) return null
+  try {
+    const updated = await apiPut<ApiAccount>(`/accounts/${id}`, body)
+    return updated
+  } catch {
+    return null
+  }
+}
+
+export async function deleteAccount(id: string): Promise<boolean> {
+  if (!hasApi) return false
+  try {
+    await apiDelete(`/accounts/${id}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function createCategory(body: {
   name: string
   type: string
@@ -233,6 +259,37 @@ export async function createBudget(body: {
     return created
   } catch {
     return null
+  }
+}
+
+export async function updateBudget(
+  id: string,
+  body: {
+    amount?: number
+    categoryId?: string
+    period?: string
+    startDate?: string
+    endDate?: string
+    alertAt80?: boolean
+    alertAt100?: boolean
+  }
+): Promise<ApiBudget | null> {
+  if (!hasApi) return null
+  try {
+    const updated = await apiPut<ApiBudget>(`/budgets/${id}`, body)
+    return updated
+  } catch {
+    return null
+  }
+}
+
+export async function deleteBudget(id: string): Promise<boolean> {
+  if (!hasApi) return false
+  try {
+    await apiDelete(`/budgets/${id}`)
+    return true
+  } catch {
+    return false
   }
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -29,133 +29,49 @@ import {
   CreditCard,
   Landmark,
   PiggyBank,
-  MoreHorizontal,
   TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Edit,
-  Trash2,
   Eye,
   EyeOff,
+  MoreHorizontal,
+  Edit,
+  Trash2,
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { fetchAccounts, createAccount, updateAccount, deleteAccount, hasApi, toNum } from "@/lib/api-data"
 
-// ============================================
-// MOCK DATA
-// ============================================
-
-const accounts = [
-  {
-    id: "1",
-    name: "Nubank",
-    type: "CREDIT_CARD",
-    currentBalance: -1250.5,
-    creditLimit: 8000,
-    color: "#8b05be",
-    icon: CreditCard,
-    dueDate: 15,
-    transactions: 24,
-  },
-  {
-    id: "2",
-    name: "Itaú Conta Corrente",
-    type: "CHECKING",
-    currentBalance: 15420.75,
-    color: "#ff7f00",
-    icon: Landmark,
-    transactions: 18,
-  },
-  {
-    id: "3",
-    "name": "XP Investimentos",
-    type: "INVESTMENT",
-    currentBalance: 45230.0,
-    color: "#000000",
-    icon: TrendingUp,
-    transactions: 5,
-  },
-  {
-    id: "4",
-    name: "Nubank Poupança",
-    type: "SAVINGS",
-    currentBalance: 12500.0,
-    color: "#8b05be",
-    icon: PiggyBank,
-    transactions: 3,
-  },
-  {
-    id: "5",
-    name: "Carteira",
-    type: "WALLET",
-    currentBalance: 350.0,
-    color: "#10b981",
-    icon: Wallet,
-    transactions: 12,
-  },
-]
-
-const recentAccountTransactions = [
-  {
-    id: "1",
-    description: "Supermercado Extra",
-    date: new Date("2024-12-15"),
-    amount: -450.5,
-    account: "Nubank",
-  },
-  {
-    id: "2",
-    description: "Depósito",
-    date: new Date("2024-12-14"),
-    amount: 5000.0,
-    account: "Itaú Conta Corrente",
-  },
-  {
-    id: "3",
-    description: "Compra de CDB",
-    date: new Date("2024-12-13"),
-    amount: -5000.0,
-    account: "XP Investimentos",
-  },
-  {
-    id: "4",
-    description: "Transferência",
-    date: new Date("2024-12-12"),
-    amount: 1000.0,
-    account: "Nubank Poupança",
-  },
-]
-
-// ============================================
-// ACCOUNT TYPE CONFIG
-// ============================================
-
-const accountTypeConfig = {
-  CHECKING: { label: "Conta Corrente", color: "bg-blue-500" },
-  SAVINGS: { label: "Poupança", color: "bg-emerald-500" },
-  INVESTMENT: { label: "Investimento", color: "bg-violet-500" },
-  CREDIT_CARD: { label: "Cartão de Crédito", color: "bg-rose-500" },
-  WALLET: { label: "Dinheiro", color: "bg-amber-500" },
-  OTHER: { label: "Outro", color: "bg-gray-500" },
+const accountTypeConfig: Record<string, { label: string; icon: typeof Wallet }> = {
+  CHECKING: { label: "Conta Corrente", icon: Landmark },
+  SAVINGS: { label: "Poupança", icon: PiggyBank },
+  INVESTMENT: { label: "Investimento", icon: TrendingUp },
+  CREDIT_CARD: { label: "Cartão de Crédito", icon: CreditCard },
+  WALLET: { label: "Dinheiro", icon: Wallet },
+  OTHER: { label: "Outro", icon: Wallet },
 }
 
-// ============================================
-// ACCOUNT CARD COMPONENT
-// ============================================
-
-interface AccountCardProps {
-  account: typeof accounts[0]
+type AccountRow = {
+  id: string
+  name: string
+  type: string
+  currentBalance: number
+  creditLimit?: number
+  color?: string
 }
 
-function AccountCard({ account }: AccountCardProps) {
+function AccountCard({ account, onEdit, onDelete }: { account: AccountRow; onEdit?: (account: AccountRow) => void; onDelete?: (account: AccountRow) => void }) {
   const [showBalance, setShowBalance] = useState(true)
   const isCreditCard = account.type === "CREDIT_CARD"
-  const usedCredit = isCreditCard ? Math.abs(account.currentBalance) : 0
-  const availableCredit = isCreditCard ? (account.creditLimit || 0) - usedCredit : 0
-  const utilizationRate = isCreditCard && account.creditLimit
-    ? (usedCredit / account.creditLimit) * 100
-    : 0
-
-  const Icon = account.icon
+  const creditLimit = account.creditLimit ?? 0
+  const usedCreditAmount = isCreditCard && account.currentBalance < 0 ? Math.abs(account.currentBalance) : 0
+  const availableCredit = creditLimit - usedCreditAmount
+  const utilizationRate = isCreditCard && creditLimit > 0 ? (usedCreditAmount / creditLimit) * 100 : 0
+  const config = accountTypeConfig[account.type] ?? accountTypeConfig.OTHER
+  const Icon = config.icon
+  const color = account.color ?? "#6366f1"
 
   return (
     <Card className="card-hover">
@@ -164,14 +80,14 @@ function AccountCard({ account }: AccountCardProps) {
           <div className="flex items-center gap-3">
             <div
               className="h-12 w-12 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: `${account.color}20` }}
+              style={{ backgroundColor: `${color}20` }}
             >
-              <Icon className="h-6 w-6" style={{ color: account.color }} />
+              <Icon className="h-6 w-6" style={{ color }} />
             </div>
             <div>
               <h3 className="font-semibold">{account.name}</h3>
               <Badge variant="secondary" className="text-xs">
-                {accountTypeConfig[account.type as keyof typeof accountTypeConfig]?.label}
+                {config.label}
               </Badge>
             </div>
           </div>
@@ -182,93 +98,138 @@ function AccountCard({ account }: AccountCardProps) {
               className="h-8 w-8"
               onClick={() => setShowBalance(!showBalance)}
             >
-              {showBalance ? (
-                <EyeOff className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Eye className="h-4 w-4 text-muted-foreground" />
-              )}
+              {showBalance ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </Button>
+            {hasApi && (onEdit || onDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit?.(account)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(account)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
 
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-muted-foreground">
-              {isCreditCard ? "Fatura Atual" : "Saldo"}
-            </p>
-            <p
-              className={`text-2xl font-bold ${
-                isCreditCard
-                  ? "text-rose-600"
-                  : account.currentBalance >= 0
-                  ? "text-emerald-600"
-                  : "text-rose-600"
-              }`}
-            >
+            <p className="text-sm text-muted-foreground">{isCreditCard ? "Fatura Atual" : "Saldo"}</p>
+            <p className={`text-2xl font-bold ${isCreditCard ? "text-rose-600" : account.currentBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
               {showBalance ? formatCurrency(account.currentBalance) : "R$ ••••••"}
             </p>
           </div>
 
-          {isCreditCard && (
+          {isCreditCard && creditLimit > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Limite Utilizado</span>
                 <span className="font-medium">{utilizationRate.toFixed(0)}%</span>
               </div>
               <Progress
-                value={utilizationRate}
+                value={Math.min(utilizationRate, 100)}
                 className="h-2"
-                indicatorClassName={
-                  utilizationRate > 80
-                    ? "bg-rose-500"
-                    : utilizationRate > 50
-                    ? "bg-amber-500"
-                    : "bg-emerald-500"
-                }
+                indicatorClassName={utilizationRate > 80 ? "bg-rose-500" : utilizationRate > 50 ? "bg-amber-500" : "bg-emerald-500"}
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Utilizado: {formatCurrency(usedCredit)}</span>
+                <span>Utilizado: {formatCurrency(usedCreditAmount)}</span>
                 <span>Disponível: {formatCurrency(availableCredit)}</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Vencimento: dia {account.dueDate}
-              </p>
             </div>
           )}
-
-          <div className="pt-4 border-t">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Transações (mês)</span>
-              <span className="font-medium">{account.transactions}</span>
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>
   )
 }
 
-// ============================================
-// NEW ACCOUNT FORM
-// ============================================
+function AccountForm({
+  onClose,
+  onSuccess,
+  initialAccount,
+}: {
+  onClose: () => void
+  onSuccess?: () => void
+  initialAccount?: AccountRow | null
+}) {
+  const isEdit = Boolean(initialAccount)
+  const [name, setName] = useState(initialAccount?.name ?? "")
+  const [type, setType] = useState(initialAccount?.type ?? "CHECKING")
+  const [initialBalance, setInitialBalance] = useState(initialAccount ? "" : "")
+  const [color, setColor] = useState(initialAccount?.color ?? "#6366f1")
+  const [creditLimit, setCreditLimit] = useState(initialAccount?.creditLimit != null ? String(initialAccount.creditLimit) : "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
 
-function NewAccountForm({ onClose }: { onClose: () => void }) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    if (!name.trim()) {
+      setError("Informe o nome da conta.")
+      return
+    }
+    if (!hasApi) {
+      setError("Conecte o backend (NEXT_PUBLIC_API_URL).")
+      return
+    }
+    setSaving(true)
+    try {
+      if (isEdit && initialAccount) {
+        const updated = await updateAccount(initialAccount.id, {
+          name: name.trim(),
+          type,
+          color: color || undefined,
+          creditLimit: creditLimit ? parseFloat(creditLimit) : undefined,
+        })
+        if (updated) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError("Falha ao atualizar conta.")
+        }
+      } else {
+        const created = await createAccount({
+          name: name.trim(),
+          type,
+          initialBalance: initialBalance ? parseFloat(initialBalance) : 0,
+          color: color || undefined,
+          creditLimit: creditLimit ? parseFloat(creditLimit) : undefined,
+        })
+        if (created) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError("Falha ao criar conta.")
+        }
+      }
+    } catch {
+      setError("Erro ao conectar com o backend.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <form className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      {error && <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>}
       <div className="space-y-2">
         <Label>Nome da Conta</Label>
-        <Input placeholder="Ex: Nubank, Itaú, etc." />
+        <Input placeholder="Ex: Nubank, Itaú" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
-
       <div className="space-y-2">
         <Label>Tipo de Conta</Label>
-        <Select>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o tipo" />
-          </SelectTrigger>
+        <Select value={type} onValueChange={setType}>
+          <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="CHECKING">Conta Corrente</SelectItem>
             <SelectItem value="SAVINGS">Poupança</SelectItem>
@@ -279,49 +240,98 @@ function NewAccountForm({ onClose }: { onClose: () => void }) {
           </SelectContent>
         </Select>
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Saldo Inicial</Label>
-          <Input type="number" step="0.01" placeholder="0,00" />
-        </div>
+      <div className={isEdit ? "space-y-2" : "grid grid-cols-2 gap-4"}>
+        {!isEdit && (
+          <div className="space-y-2">
+            <Label>Saldo Inicial</Label>
+            <Input type="number" step="0.01" placeholder="0,00" value={initialBalance} onChange={(e) => setInitialBalance(e.target.value)} />
+          </div>
+        )}
         <div className="space-y-2">
           <Label>Cor</Label>
-          <Input type="color" defaultValue="#6366f1" />
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+              title="Escolher cor"
+            />
+            <Input
+              type="text"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="#6366f1"
+              className="font-mono text-sm"
+            />
+          </div>
         </div>
       </div>
-
       <div className="space-y-2">
         <Label>Limite de Crédito (opcional)</Label>
-        <Input type="number" step="0.01" placeholder="0,00" />
+        <Input type="number" step="0.01" placeholder="0,00" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
       </div>
-
-      <div className="space-y-2">
-        <Label>Dia do Vencimento (opcional)</Label>
-        <Input type="number" min={1} max={31} placeholder="15" />
-      </div>
-
       <div className="flex justify-end gap-2 pt-4">
-        <Button variant="outline" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button type="submit">Criar Conta</Button>
+        <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+        <Button type="submit" disabled={saving}>{saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Criar Conta"}</Button>
       </div>
     </form>
   )
 }
 
-// ============================================
-// MAIN WALLET PAGE
-// ============================================
-
 export default function WalletPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null)
   const [activeTab, setActiveTab] = useState("all")
+  const [accounts, setAccounts] = useState<AccountRow[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredAccounts = activeTab === "all"
-    ? accounts
-    : accounts.filter((a) => a.type === activeTab.toUpperCase())
+  const handleDelete = async (account: AccountRow) => {
+    if (!hasApi) return
+    if (!window.confirm(`Excluir a conta "${account.name}"?`)) return
+    const ok = await deleteAccount(account.id)
+    if (ok) refetch()
+  }
+
+  const refetch = () => {
+    if (!hasApi) return
+    fetchAccounts().then((list) => {
+      setAccounts(
+        list.map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          currentBalance: toNum(a.currentBalance),
+          creditLimit: a.creditLimit != null ? toNum(a.creditLimit) : undefined,
+          color: a.color,
+        }))
+      )
+    })
+  }
+
+  useEffect(() => {
+    if (!hasApi) {
+      setLoading(false)
+      return
+    }
+    fetchAccounts()
+      .then((list) => {
+        setAccounts(
+          list.map((a) => ({
+            id: a.id,
+            name: a.name,
+            type: a.type,
+            currentBalance: toNum(a.currentBalance),
+            creditLimit: a.creditLimit != null ? toNum(a.creditLimit) : undefined,
+            color: a.color,
+          }))
+        )
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const filteredAccounts = activeTab === "all" ? accounts : accounts.filter((a) => a.type === activeTab)
 
   const totalBalance = accounts
     .filter((a) => a.type !== "CREDIT_CARD")
@@ -329,11 +339,10 @@ export default function WalletPage() {
 
   const totalCreditUsed = accounts
     .filter((a) => a.type === "CREDIT_CARD")
-    .reduce((acc, a) => acc + Math.abs(a.currentBalance), 0)
-
+    .reduce((acc, a) => acc + (a.currentBalance < 0 ? Math.abs(a.currentBalance) : 0), 0)
   const totalCreditLimit = accounts
     .filter((a) => a.type === "CREDIT_CARD")
-    .reduce((acc, a) => acc + (a.creditLimit || 0), 0)
+    .reduce((acc, a) => acc + (a.creditLimit ?? 0), 0)
 
   return (
     <div className="space-y-6">
@@ -356,7 +365,21 @@ export default function WalletPage() {
             <DialogHeader>
               <DialogTitle>Nova Conta</DialogTitle>
             </DialogHeader>
-            <NewAccountForm onClose={() => setIsDialogOpen(false)} />
+            <AccountForm onClose={() => setIsDialogOpen(false)} onSuccess={() => { refetch(); setIsDialogOpen(false) }} />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={editingAccount !== null} onOpenChange={(open) => !open && setEditingAccount(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Conta</DialogTitle>
+            </DialogHeader>
+            {editingAccount && (
+              <AccountForm
+                onClose={() => setEditingAccount(null)}
+                onSuccess={() => { refetch(); setEditingAccount(null) }}
+                initialAccount={editingAccount}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -421,65 +444,25 @@ export default function WalletPage() {
 
         <TabsContent value={activeTab} className="mt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredAccounts.map((account) => (
-              <AccountCard key={account.id} account={account} />
-            ))}
+            {loading ? (
+              <p className="text-muted-foreground col-span-full py-8 text-center">Carregando…</p>
+            ) : filteredAccounts.length === 0 ? (
+              <p className="text-muted-foreground col-span-full py-8 text-center">
+                {hasApi ? "Nenhuma conta. Clique em \"Nova Conta\" para criar." : "Conecte o backend (NEXT_PUBLIC_API_URL) para gerenciar contas."}
+              </p>
+            ) : (
+              filteredAccounts.map((account) => (
+                <AccountCard
+                  key={account.id}
+                  account={account}
+                  onEdit={hasApi ? setEditingAccount : undefined}
+                  onDelete={hasApi ? handleDelete : undefined}
+                />
+              ))
+            )}
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Recent Transactions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Transações Recentes</CardTitle>
-          <CardDescription>
-            Últimas movimentações entre contas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentAccountTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      transaction.amount >= 0
-                        ? "bg-emerald-100"
-                        : "bg-rose-100"
-                    }`}
-                  >
-                    {transaction.amount >= 0 ? (
-                      <ArrowUpRight className="h-5 w-5 text-emerald-600" />
-                    ) : (
-                      <ArrowDownRight className="h-5 w-5 text-rose-600" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium">{transaction.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {transaction.account} •{" "}
-                      {transaction.date.toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className={`font-medium ${
-                    transaction.amount >= 0
-                      ? "text-emerald-600"
-                      : "text-rose-600"
-                  }`}
-                >
-                  {transaction.amount >= 0 ? "+" : ""}
-                  {formatCurrency(transaction.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

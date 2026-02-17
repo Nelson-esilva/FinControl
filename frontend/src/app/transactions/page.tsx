@@ -75,160 +75,6 @@ import {
 } from "@/lib/api-data"
 
 // ============================================
-// MOCK DATA
-// ============================================
-
-const transactions = [
-  {
-    id: "1",
-    date: new Date("2024-12-15"),
-    description: "Supermercado Extra",
-    category: { name: "Alimentação", color: "#f43f5e", icon: "ShoppingCart" },
-    account: { name: "Nubank", type: "CREDIT_CARD" },
-    amount: -450.5,
-    type: "EXPENSE",
-    status: "COMPLETED",
-    hasAttachment: true,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "2",
-    date: new Date("2024-12-14"),
-    description: "Salário Mensal",
-    category: { name: "Renda", color: "#10b981", icon: "DollarSign" },
-    account: { name: "Itaú", type: "CHECKING" },
-    amount: 8500.0,
-    type: "INCOME",
-    status: "COMPLETED",
-    hasAttachment: false,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "3",
-    date: new Date("2024-12-13"),
-    description: "iPhone 15 Pro",
-    category: { name: "Eletrônicos", color: "#8b5cf6", icon: "Smartphone" },
-    account: { name: "Nubank", type: "CREDIT_CARD" },
-    amount: -899.9,
-    type: "EXPENSE",
-    status: "PENDING",
-    hasAttachment: true,
-    installmentNumber: 1,
-    totalInstallments: 12,
-  },
-  {
-    id: "4",
-    date: new Date("2024-12-12"),
-    description: "Uber - Viagem",
-    category: { name: "Transporte", color: "#f59e0b", icon: "Car" },
-    account: { name: "Nubank", type: "CREDIT_CARD" },
-    amount: -28.9,
-    type: "EXPENSE",
-    status: "COMPLETED",
-    hasAttachment: false,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "5",
-    date: new Date("2024-12-11"),
-    description: "Netflix Assinatura",
-    category: { name: "Lazer", color: "#06b6d4", icon: "Tv" },
-    account: { name: "Nubank", type: "CREDIT_CARD" },
-    amount: -39.9,
-    type: "EXPENSE",
-    status: "COMPLETED",
-    hasAttachment: true,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "6",
-    date: new Date("2024-12-10"),
-    description: "Freelance Projeto Web",
-    category: { name: "Renda Extra", color: "#10b981", icon: "Code" },
-    account: { name: "Itaú", type: "CHECKING" },
-    amount: 2500.0,
-    type: "INCOME",
-    status: "COMPLETED",
-    hasAttachment: true,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "7",
-    date: new Date("2024-12-09"),
-    description: "Aluguel Dezembro",
-    category: { name: "Moradia", color: "#8b5cf6", icon: "Home" },
-    account: { name: "Itaú", type: "CHECKING" },
-    amount: -2800.0,
-    type: "EXPENSE",
-    status: "COMPLETED",
-    hasAttachment: true,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "8",
-    date: new Date("2024-12-08"),
-    description: "Academia SmartFit",
-    category: { name: "Saúde", color: "#14b8a6", icon: "Dumbbell" },
-    account: { name: "Nubank", type: "CREDIT_CARD" },
-    amount: -99.9,
-    type: "EXPENSE",
-    status: "PENDING",
-    hasAttachment: false,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "9",
-    date: new Date("2024-12-07"),
-    description: "Restaurante Outback",
-    category: { name: "Alimentação", color: "#f43f5e", icon: "Utensils" },
-    account: { name: "Nubank", type: "CREDIT_CARD" },
-    amount: -180.0,
-    type: "EXPENSE",
-    status: "COMPLETED",
-    hasAttachment: false,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-  {
-    id: "10",
-    date: new Date("2024-12-06"),
-    description: "Dividendos BBAS3",
-    category: { name: "Investimentos", color: "#6366f1", icon: "TrendingUp" },
-    account: { name: "XP Investimentos", type: "INVESTMENT" },
-    amount: 450.75,
-    type: "INCOME",
-    status: "COMPLETED",
-    hasAttachment: false,
-    installmentNumber: null,
-    totalInstallments: null,
-  },
-]
-
-const categories = [
-  { id: "1", name: "Alimentação", color: "#f43f5e" },
-  { id: "2", name: "Renda", color: "#10b981" },
-  { id: "3", name: "Eletrônicos", color: "#8b5cf6" },
-  { id: "4", name: "Transporte", color: "#f59e0b" },
-  { id: "5", name: "Lazer", color: "#06b6d4" },
-  { id: "6", name: "Moradia", color: "#8b5cf6" },
-  { id: "7", name: "Saúde", color: "#14b8a6" },
-  { id: "8", name: "Investimentos", color: "#6366f1" },
-]
-
-const accounts = [
-  { id: "1", name: "Nubank", type: "CREDIT_CARD" },
-  { id: "2", name: "Itaú", type: "CHECKING" },
-  { id: "3", name: "XP Investimentos", type: "INVESTMENT" },
-]
-
-// ============================================
 // STATUS BADGE COMPONENT
 // ============================================
 
@@ -695,15 +541,9 @@ export default function TransactionsPage() {
     )
   }
 
-  const listTransactions: TransactionRow[] =
-    hasApi && apiTransactions.length >= 0
-      ? apiTransactions
-      : transactions.map((t) => ({
-          ...t,
-          date: t.date instanceof Date ? t.date : new Date(t.date),
-        }))
-  const listCategories = hasApi && apiCategories.length > 0 ? apiCategories : categories
-  const listAccounts = hasApi && apiAccounts.length > 0 ? apiAccounts : accounts
+  const listTransactions: TransactionRow[] = apiTransactions
+  const listCategories = apiCategories
+  const listAccounts = apiAccounts
 
   const filteredTransactions = listTransactions.filter((t) => {
     const matchesSearch = t.description
@@ -942,7 +782,26 @@ export default function TransactionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTransactions.map((transaction) => (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Carregando…
+                  </TableCell>
+                </TableRow>
+              ) : listTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    {hasApi ? "Nenhuma transação. Clique em \"Nova Transação\" para criar." : "Conecte o backend (NEXT_PUBLIC_API_URL) para ver e criar transações."}
+                  </TableCell>
+                </TableRow>
+              ) : filteredTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Nenhum resultado para os filtros aplicados.
+                  </TableCell>
+                </TableRow>
+              ) : (
+              filteredTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell className="whitespace-nowrap">
                     {formatDate(transaction.date)}
@@ -1029,7 +888,8 @@ export default function TransactionsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+            )}
             </TableBody>
           </Table>
         </CardContent>

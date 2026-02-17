@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -21,6 +21,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
 import { formatCurrency, formatPercentage } from "@/lib/utils"
 import {
@@ -32,92 +38,51 @@ import {
   CheckCircle2,
   Edit,
   Trash2,
-  Calendar,
+  MoreHorizontal,
   PieChart,
 } from "lucide-react"
+import {
+  fetchBudgets,
+  fetchCategories,
+  createBudget,
+  updateBudget,
+  deleteBudget,
+  hasApi,
+  toNum,
+} from "@/lib/api-data"
 
-// ============================================
-// MOCK DATA
-// ============================================
+const periodLabels: Record<string, string> = {
+  WEEKLY: "Semanal",
+  MONTHLY: "Mensal",
+  YEARLY: "Anual",
+}
 
-const budgets = [
-  {
-    id: "1",
-    category: { name: "Alimentação", color: "#f43f5e", icon: "ShoppingCart" },
-    amount: 2500,
-    spent: 2100,
-    period: "Mensal",
-    alertAt80: true,
-    alertAt100: true,
-  },
-  {
-    id: "2",
-    category: { name: "Transporte", color: "#f59e0b", icon: "Car" },
-    amount: 800,
-    spent: 650,
-    period: "Mensal",
-    alertAt80: true,
-    alertAt100: true,
-  },
-  {
-    id: "3",
-    category: { name: "Lazer", color: "#06b6d4", icon: "Gamepad2" },
-    amount: 600,
-    spent: 720,
-    period: "Mensal",
-    alertAt80: true,
-    alertAt100: true,
-  },
-  {
-    id: "4",
-    category: { name: "Saúde", color: "#10b981", icon: "Heart" },
-    amount: 500,
-    spent: 200,
-    period: "Mensal",
-    alertAt80: true,
-    alertAt100: true,
-  },
-  {
-    id: "5",
-    category: { name: "Moradia", color: "#8b5cf6", icon: "Home" },
-    amount: 3000,
-    spent: 2800,
-    period: "Mensal",
-    alertAt80: true,
-    alertAt100: true,
-  },
-  {
-    id: "6",
-    category: { name: "Compras", color: "#ec4899", icon: "ShoppingBag" },
-    amount: 400,
-    spent: 150,
-    period: "Mensal",
-    alertAt80: true,
-    alertAt100: true,
-  },
-]
-
-const categories = [
-  { id: "1", name: "Alimentação", color: "#f43f5e" },
-  { id: "2", name: "Transporte", color: "#f59e0b" },
-  { id: "3", name: "Lazer", color: "#06b6d4" },
-  { id: "4", name: "Saúde", color: "#10b981" },
-  { id: "5", name: "Moradia", color: "#8b5cf6" },
-  { id: "6", name: "Compras", color: "#ec4899" },
-  { id: "7", name: "Educação", color: "#6366f1" },
-  { id: "8", name: "Outros", color: "#6b7280" },
-]
+type BudgetRow = {
+  id: string
+  category: { name: string; color: string }
+  amount: number
+  spent: number
+  period: string
+  periodLabel: string
+  alertAt80: boolean
+  alertAt100: boolean
+  categoryId: string
+  startDate: string
+  endDate: string
+}
 
 // ============================================
 // BUDGET CARD COMPONENT
 // ============================================
 
 interface BudgetCardProps {
-  budget: typeof budgets[0]
+  budget: BudgetRow
+  onEdit?: (budget: BudgetRow) => void
+  onDelete?: (budget: BudgetRow) => void
 }
 
-function BudgetCard({ budget }: BudgetCardProps) {
-  const percentage = (budget.spent / budget.amount) * 100
+function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
+  const percentage = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0
   const remaining = budget.amount - budget.spent
   const isNearLimit = percentage >= 80 && percentage < 100
   const isOverLimit = percentage >= 100
@@ -139,11 +104,33 @@ function BudgetCard({ budget }: BudgetCardProps) {
             <div>
               <h3 className="font-semibold">{budget.category.name}</h3>
               <Badge variant="secondary" className="text-xs">
-                {budget.period}
+                {budget.periodLabel}
               </Badge>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {hasApi && (onEdit || onDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit?.(budget)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => onDelete?.(budget)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {isOverLimit && (
               <AlertTriangle className="h-5 w-5 text-rose-500" />
             )}
@@ -240,25 +227,115 @@ function BudgetCard({ budget }: BudgetCardProps) {
 }
 
 // ============================================
-// NEW BUDGET FORM
+// BUDGET FORM (CREATE / EDIT)
 // ============================================
 
-function NewBudgetForm({ onClose }: { onClose: () => void }) {
+type BudgetFormInitial = {
+  id: string
+  categoryId: string
+  amount: number
+  period: string
+  startDate: string
+  endDate: string
+  alertAt80: boolean
+  alertAt100: boolean
+}
+
+function BudgetForm({
+  onClose,
+  onSuccess,
+  categories: formCategories,
+  initialBudget,
+}: {
+  onClose: () => void
+  onSuccess?: () => void
+  categories: Array<{ id: string; name: string; color?: string }>
+  initialBudget?: BudgetFormInitial | null
+}) {
+  const isEdit = Boolean(initialBudget)
+  const [categoryId, setCategoryId] = useState(initialBudget?.categoryId ?? "")
+  const [amount, setAmount] = useState(initialBudget ? String(initialBudget.amount) : "")
+  const [period, setPeriod] = useState(initialBudget?.period ?? "MONTHLY")
+  const [startDate, setStartDate] = useState(initialBudget?.startDate ?? "")
+  const [endDate, setEndDate] = useState(initialBudget?.endDate ?? "")
+  const [alertAt80, setAlertAt80] = useState(initialBudget?.alertAt80 ?? true)
+  const [alertAt100, setAlertAt100] = useState(initialBudget?.alertAt100 ?? true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    const numAmount = parseFloat(amount)
+    if (!amount || Number.isNaN(numAmount) || numAmount <= 0) {
+      setError("Informe um valor válido.")
+      return
+    }
+    if (!categoryId) {
+      setError("Selecione a categoria.")
+      return
+    }
+    if (!startDate || !endDate) {
+      setError("Informe data de início e fim.")
+      return
+    }
+    if (!hasApi) {
+      setError("API não configurada.")
+      return
+    }
+    setSaving(true)
+    try {
+      const body = {
+        amount: numAmount,
+        categoryId,
+        period,
+        startDate,
+        endDate,
+        alertAt80,
+        alertAt100,
+      }
+      if (isEdit && initialBudget) {
+        const updated = await updateBudget(initialBudget.id, body)
+        if (updated) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError("Falha ao atualizar orçamento.")
+        }
+      } else {
+        const created = await createBudget(body)
+        if (created) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError("Falha ao criar orçamento.")
+        }
+      }
+    } catch {
+      setError("Erro ao conectar com o backend.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <form className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      {error && (
+        <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>
+      )}
       <div className="space-y-2">
         <Label>Categoria</Label>
-        <Select>
+        <Select value={categoryId} onValueChange={setCategoryId} disabled={isEdit}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione a categoria" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((cat) => (
+            {formCategories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id}>
                 <div className="flex items-center gap-2">
                   <div
                     className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: cat.color }}
+                    style={{ backgroundColor: cat.color ?? "#6366f1" }}
                   />
                   {cat.name}
                 </div>
@@ -270,12 +347,18 @@ function NewBudgetForm({ onClose }: { onClose: () => void }) {
 
       <div className="space-y-2">
         <Label>Valor do Orçamento</Label>
-        <Input type="number" step="0.01" placeholder="0,00" />
+        <Input
+          type="number"
+          step="0.01"
+          placeholder="0,00"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
       </div>
 
       <div className="space-y-2">
         <Label>Período</Label>
-        <Select defaultValue="MONTHLY">
+        <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -287,6 +370,17 @@ function NewBudgetForm({ onClose }: { onClose: () => void }) {
         </Select>
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Data início</Label>
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Data fim</Label>
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+
       <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
@@ -295,9 +389,8 @@ function NewBudgetForm({ onClose }: { onClose: () => void }) {
               Receber notificação ao atingir 80% do orçamento
             </p>
           </div>
-          <Switch id="alert-80" defaultChecked />
+          <Switch id="alert-80" checked={alertAt80} onCheckedChange={setAlertAt80} />
         </div>
-
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="alert-100">Alerta aos 100%</Label>
@@ -305,15 +398,17 @@ function NewBudgetForm({ onClose }: { onClose: () => void }) {
               Receber notificação ao atingir 100% do orçamento
             </p>
           </div>
-          <Switch id="alert-100" defaultChecked />
+          <Switch id="alert-100" checked={alertAt100} onCheckedChange={setAlertAt100} />
         </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit">Criar Orçamento</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Criar Orçamento"}
+        </Button>
       </div>
     </form>
   )
@@ -325,16 +420,96 @@ function NewBudgetForm({ onClose }: { onClose: () => void }) {
 
 export default function BudgetPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingBudget, setEditingBudget] = useState<BudgetRow | null>(null)
+  const [apiBudgets, setApiBudgets] = useState<BudgetRow[]>([])
+  const [apiCategories, setApiCategories] = useState<Array<{ id: string; name: string; color?: string }>>([])
+  const [loading, setLoading] = useState(true)
 
-  const totalBudget = budgets.reduce((acc, b) => acc + b.amount, 0)
-  const totalSpent = budgets.reduce((acc, b) => acc + b.spent, 0)
+  const refetch = () => {
+    if (!hasApi) return
+    fetchBudgets().then((list) => {
+      setApiBudgets(
+        list.map((b) => ({
+          id: b.id,
+          category: {
+            name: b.category?.name ?? "",
+            color: b.category?.color ?? "#6366f1",
+          },
+          amount: toNum(b.amount),
+          spent: typeof b.spent === "number" ? b.spent : 0,
+          period: b.period ?? "MONTHLY",
+          periodLabel: periodLabels[b.period ?? "MONTHLY"] ?? b.period ?? "Mensal",
+          alertAt80: (b as { alertAt80?: boolean }).alertAt80 ?? true,
+          alertAt100: (b as { alertAt100?: boolean }).alertAt100 ?? true,
+          categoryId: b.categoryId,
+          startDate: b.startDate?.slice?.(0, 10) ?? "",
+          endDate: b.endDate?.slice?.(0, 10) ?? "",
+        }))
+      )
+    })
+  }
+
+  useEffect(() => {
+    if (!hasApi) {
+      setLoading(false)
+      return
+    }
+    Promise.all([fetchBudgets(), fetchCategories()])
+      .then(([list, cats]) => {
+        setApiBudgets(
+          list.map((b) => ({
+            id: b.id,
+            category: {
+              name: b.category?.name ?? "",
+              color: b.category?.color ?? "#6366f1",
+            },
+            amount: toNum(b.amount),
+            spent: typeof b.spent === "number" ? b.spent : 0,
+            period: b.period ?? "MONTHLY",
+            periodLabel: periodLabels[b.period ?? "MONTHLY"] ?? b.period ?? "Mensal",
+            alertAt80: b.alertAt80 ?? true,
+            alertAt100: b.alertAt100 ?? true,
+            categoryId: b.categoryId,
+            startDate: b.startDate?.slice?.(0, 10) ?? "",
+            endDate: b.endDate?.slice?.(0, 10) ?? "",
+          }))
+        )
+        setApiCategories(cats.map((c) => ({ id: c.id, name: c.name, color: c.color })))
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const listBudgets: BudgetRow[] = apiBudgets
+  const listCategories = apiCategories
+
+  const totalBudget = listBudgets.reduce((acc, b) => acc + b.amount, 0)
+  const totalSpent = listBudgets.reduce((acc, b) => acc + b.spent, 0)
   const totalRemaining = totalBudget - totalSpent
-  const overallPercentage = (totalSpent / totalBudget) * 100
+  const overallPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
 
-  const exceededBudgets = budgets.filter((b) => b.spent > b.amount)
-  const nearLimitBudgets = budgets.filter(
-    (b) => b.spent / b.amount >= 0.8 && b.spent <= b.amount
+  const exceededBudgets = listBudgets.filter((b) => b.spent > b.amount)
+  const nearLimitBudgets = listBudgets.filter(
+    (b) => b.amount > 0 && b.spent / b.amount >= 0.8 && b.spent <= b.amount
   )
+
+  const toFormInitial = (row: BudgetRow): BudgetFormInitial => ({
+    id: row.id,
+    categoryId: row.categoryId,
+    amount: row.amount,
+    period: row.period,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    alertAt80: row.alertAt80,
+    alertAt100: row.alertAt100,
+  })
+
+  const handleDelete = async (row: BudgetRow) => {
+    if (!hasApi) return
+    if (!window.confirm("Excluir este orçamento?")) return
+    const ok = await deleteBudget(row.id)
+    if (ok) refetch()
+  }
 
   return (
     <div className="space-y-6">
@@ -357,7 +532,26 @@ export default function BudgetPage() {
             <DialogHeader>
               <DialogTitle>Novo Orçamento</DialogTitle>
             </DialogHeader>
-            <NewBudgetForm onClose={() => setIsDialogOpen(false)} />
+            <BudgetForm
+              onClose={() => setIsDialogOpen(false)}
+              onSuccess={() => { refetch(); setIsDialogOpen(false) }}
+              categories={listCategories}
+            />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={editingBudget !== null} onOpenChange={(open) => !open && setEditingBudget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Orçamento</DialogTitle>
+            </DialogHeader>
+            {editingBudget && (
+              <BudgetForm
+                onClose={() => setEditingBudget(null)}
+                onSuccess={() => { refetch(); setEditingBudget(null) }}
+                categories={listCategories}
+                initialBudget={toFormInitial(editingBudget)}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -438,7 +632,7 @@ export default function BudgetPage() {
 
       {/* Alerts */}
       {(exceededBudgets.length > 0 || nearLimitBudgets.length > 0) && (
-        <div className="space-y-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {exceededBudgets.length > 0 && (
             <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
               <div className="flex items-center gap-2 mb-2">
@@ -513,7 +707,7 @@ export default function BudgetPage() {
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-emerald-500" />
                   <span className="text-muted-foreground">
-                    {budgets.filter((b) => b.spent / b.amount < 0.8).length} dentro do orçamento
+                    {listBudgets.filter((b) => b.amount > 0 && b.spent / b.amount < 0.8).length} dentro do orçamento
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -536,9 +730,24 @@ export default function BudgetPage() {
 
       {/* Budget Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {budgets.map((budget) => (
-          <BudgetCard key={budget.id} budget={budget} />
-        ))}
+        {loading ? (
+          <p className="text-muted-foreground col-span-full py-8 text-center">Carregando…</p>
+        ) : listBudgets.length === 0 ? (
+          <p className="text-muted-foreground col-span-full py-8 text-center">
+            {hasApi
+              ? "Nenhum orçamento. Clique em \"Novo Orçamento\" para criar."
+              : "Conecte o backend (NEXT_PUBLIC_API_URL) para gerenciar orçamentos."}
+          </p>
+        ) : (
+          listBudgets.map((budget) => (
+            <BudgetCard
+              key={budget.id}
+              budget={budget}
+              onEdit={hasApi ? setEditingBudget : undefined}
+              onDelete={hasApi ? handleDelete : undefined}
+            />
+          ))
+        )}
       </div>
 
       {/* Tips */}
