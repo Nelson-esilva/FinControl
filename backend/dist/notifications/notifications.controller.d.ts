@@ -12,6 +12,7 @@ export declare class NotificationsController {
         title: string;
         isRead: boolean;
     }[]>;
+
     findOne(id: string): import(".prisma/client").Prisma.Prisma__NotificationClient<{
         id: string;
         createdAt: Date;
