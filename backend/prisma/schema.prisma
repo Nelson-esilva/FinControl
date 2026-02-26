@@ -29,11 +29,12 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  accounts      Account[]
-  transactions  Transaction[]
-  categories    Category[]
-  budgets       Budget[]
-  notifications Notification[]
+  accounts          Account[]
+  transactions      Transaction[]
+  categories        Category[]
+  budgets           Budget[]
+  notifications     Notification[]
+  recurringExpenses RecurringExpense[]
 
   @@map("users")
 }
@@ -66,7 +67,8 @@ model Account {
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String        @map("user_id")
-  transactions Transaction[]
+  transactions      Transaction[]
+  recurringExpenses RecurringExpense[]
 
   @@map("accounts")
 }
@@ -91,8 +93,9 @@ model Category {
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String        @map("user_id")
-  transactions Transaction[]
-  budgets      Budget[]
+  transactions      Transaction[]
+  budgets           Budget[]
+  recurringExpenses RecurringExpense[]
 
   @@unique([userId, name, type])
   @@map("categories")
@@ -205,4 +208,61 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// ============================================
+// RECURRING EXPENSES (Fixed, Installments, Loans, Subscriptions)
+// ============================================
+enum RecurringType {
+  FIXED         // Aluguel, condomínio, internet
+  INSTALLMENT   // Parcelamentos em geral
+  CREDIT_CARD   // Parcelas de cartão
+  LOAN          // Empréstimos e financiamentos
+  SUBSCRIPTION  // Assinaturas (streaming, apps)
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model RecurringExpense {
+  id                  String             @id @default(uuid())
+  name                String
+  description         String?
+  type                RecurringType
+  status              RecurringStatus    @default(ACTIVE)
+  amount              Decimal            @db.Decimal(15, 2)
+  frequency           RecurringFrequency @default(MONTHLY)
+  dueDay              Int?               @map("due_day")              // dia do vencimento (1-31)
+  startDate           DateTime           @map("start_date")
+  endDate             DateTime?          @map("end_date")             // null = sem prazo (despesa fixa)
+  currentInstallment  Int?               @map("current_installment")
+  totalInstallments   Int?               @map("total_installments")
+  interestRate        Decimal?           @map("interest_rate") @db.Decimal(5, 2) // juros p/ empréstimos
+  cardName            String?            @map("card_name")            // nome do cartão
+  color               String             @default("#6366f1")
+  icon                String             @default("Repeat")
+  nextDueDate         DateTime?          @map("next_due_date")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  category   Category? @relation(fields: [categoryId], references: [id])
+  categoryId String?  @map("category_id")
+  account    Account? @relation(fields: [accountId], references: [id])
+  accountId  String?  @map("account_id")
+
+  @@index([userId, status])
+  @@index([userId, type])
+  @@map("recurring_expenses")
 }

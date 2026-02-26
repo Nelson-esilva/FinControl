@@ -10,6 +10,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UploadModule } from './upload/upload.module';
+import { RecurringExpensesModule } from './recurring-expenses/recurring-expenses.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { HealthController } from './health.controller';
     BudgetsModule,
     NotificationsModule,
     AttachmentsModule,
+    RecurringExpensesModule,
   ],
   controllers: [HealthController],
 })

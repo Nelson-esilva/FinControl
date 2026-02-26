@@ -55,6 +55,7 @@ const periodLabels: Record<string, string> = {
   WEEKLY: "Semanal",
   MONTHLY: "Mensal",
   YEARLY: "Anual",
+  FIXED: "Fixas",
 }
 
 type BudgetRow = {
@@ -153,13 +154,12 @@ function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
                 {formatCurrency(budget.spent)} de {formatCurrency(budget.amount)}
               </span>
               <span
-                className={`text-sm font-medium ${
-                  isOverLimit
+                className={`text-sm font-medium ${isOverLimit
                     ? "text-rose-600"
                     : isNearLimit
-                    ? "text-amber-600"
-                    : "text-emerald-600"
-                }`}
+                      ? "text-amber-600"
+                      : "text-emerald-600"
+                  }`}
               >
                 {formatPercentage(percentage)}
               </span>
@@ -171,8 +171,8 @@ function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
                 isOverLimit
                   ? "bg-rose-500"
                   : isNearLimit
-                  ? "bg-amber-500"
-                  : "bg-emerald-500"
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
               }
             />
           </div>
@@ -181,9 +181,8 @@ function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
             <div className="rounded-lg bg-muted/50 p-3">
               <p className="text-xs text-muted-foreground mb-1">Restante</p>
               <p
-                className={`font-semibold ${
-                  remaining < 0 ? "text-rose-600" : "text-emerald-600"
-                }`}
+                className={`font-semibold ${remaining < 0 ? "text-rose-600" : "text-emerald-600"
+                  }`}
               >
                 {formatCurrency(remaining)}
               </p>
@@ -204,11 +203,10 @@ function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
 
           {(isNearLimit || isOverLimit) && (
             <div
-              className={`p-3 rounded-lg text-sm ${
-                isOverLimit
+              className={`p-3 rounded-lg text-sm ${isOverLimit
                   ? "bg-rose-50 text-rose-700 dark:bg-rose-900/20"
                   : "bg-amber-50 text-amber-700 dark:bg-amber-900/20"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
@@ -360,12 +358,13 @@ function BudgetForm({
         <Label>Período</Label>
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue placeholder="Selecione o período" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="WEEKLY">Semanal</SelectItem>
             <SelectItem value="MONTHLY">Mensal</SelectItem>
             <SelectItem value="YEARLY">Anual</SelectItem>
+            <SelectItem value="FIXED">Fixas</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -592,9 +591,8 @@ export default function BudgetPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Restante</p>
                 <p
-                  className={`text-2xl font-bold ${
-                    totalRemaining >= 0 ? "text-emerald-600" : "text-rose-600"
-                  }`}
+                  className={`text-2xl font-bold ${totalRemaining >= 0 ? "text-emerald-600" : "text-rose-600"
+                    }`}
                 >
                   {formatCurrency(totalRemaining)}
                 </p>
@@ -611,13 +609,12 @@ export default function BudgetPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Utilização</p>
                 <p
-                  className={`text-2xl font-bold ${
-                    overallPercentage > 100
+                  className={`text-2xl font-bold ${overallPercentage > 100
                       ? "text-rose-600"
                       : overallPercentage > 80
-                      ? "text-amber-600"
-                      : "text-emerald-600"
-                  }`}
+                        ? "text-amber-600"
+                        : "text-emerald-600"
+                    }`}
                 >
                   {formatPercentage(overallPercentage)}
                 </p>
@@ -680,13 +677,12 @@ export default function BudgetPage() {
                 {formatCurrency(totalSpent)} de {formatCurrency(totalBudget)}
               </span>
               <span
-                className={`text-sm font-medium ${
-                  overallPercentage > 100
+                className={`text-sm font-medium ${overallPercentage > 100
                     ? "text-rose-600"
                     : overallPercentage > 80
-                    ? "text-amber-600"
-                    : "text-emerald-600"
-                }`}
+                      ? "text-amber-600"
+                      : "text-emerald-600"
+                  }`}
               >
                 {formatPercentage(overallPercentage)}
               </span>
@@ -698,8 +694,8 @@ export default function BudgetPage() {
                 overallPercentage > 100
                   ? "bg-rose-500"
                   : overallPercentage > 80
-                  ? "bg-amber-500"
-                  : "bg-emerald-500"
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
               }
             />
             <div className="flex items-center justify-between text-sm">

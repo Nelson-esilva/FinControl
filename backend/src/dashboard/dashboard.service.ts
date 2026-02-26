@@ -6,7 +6,7 @@ const USER_ID = 'user-id';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getData() {
     const now = new Date();
@@ -16,7 +16,7 @@ export class DashboardService {
     const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-    const [accounts, transactions, recentTransactions, previousMonthCount, budgets] = await Promise.all([
+    const [accounts, transactions, recentTransactions, previousMonthCount, budgets, fixedExpenses] = await Promise.all([
       this.prisma.account.findMany({
         where: { userId: USER_ID, isActive: true },
       }),
@@ -47,6 +47,13 @@ export class DashboardService {
           isActive: true,
           startDate: { lte: endOfMonth },
           endDate: { gte: startOfMonth },
+        },
+      }),
+      this.prisma.recurringExpense.findMany({
+        where: {
+          userId: USER_ID,
+          type: 'FIXED',
+          status: 'ACTIVE',
         },
       }),
     ]);
@@ -109,6 +116,24 @@ export class DashboardService {
         };
       });
 
+    const fixedExpensesSummary = monthNames.map((_, idx) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 11 + idx, 1);
+
+      const totalFixed = fixedExpenses
+        .filter(e => {
+          const startD = new Date(e.startDate);
+          const isStarted = startD <= d;
+          const isNotEnded = !e.endDate || new Date(e.endDate) >= d;
+          return isStarted && isNotEnded;
+        })
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      return {
+        month: monthNames[d.getMonth()],
+        value: totalFixed
+      };
+    });
+
     const monthlyBalance = monthlyIncome - monthlyExpense;
     const savingsGoalPercent = 20;
     const savingsGoalPlanned = (monthlyIncome * savingsGoalPercent) / 100;
@@ -138,6 +163,7 @@ export class DashboardService {
       totalBudgetLimit,
       spendingLimitUsedPercent,
       monthlySummary,
+      fixedExpensesSummary,
       recentTransactions: recentTransactions.map((t) => ({
         id: t.id,
         description: t.description,

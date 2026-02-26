@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   PiggyBank,
+  TrendingDown,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
@@ -53,6 +54,12 @@ const navigation = [
     href: "/budget",
     icon: Target,
     description: "Metas e limites",
+  },
+  {
+    name: "Despesas",
+    href: "/expenses",
+    icon: TrendingDown,
+    description: "Fixas, parcelamentos e empréstimos",
   },
 ]
 

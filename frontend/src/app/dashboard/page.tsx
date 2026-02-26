@@ -33,6 +33,8 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
 } from "recharts"
 
 // ============================================
@@ -49,11 +51,11 @@ interface KPICardProps {
 
 function KPICard({ title, value, change, icon: Icon, format = "currency" }: KPICardProps) {
   const isPositive = change >= 0
-  const formattedValue = format === "currency" 
-    ? formatCurrency(value) 
-    : format === "percentage" 
-    ? formatPercentage(value)
-    : value.toString()
+  const formattedValue = format === "currency"
+    ? formatCurrency(value)
+    : format === "percentage"
+      ? formatPercentage(value)
+      : value.toString()
 
   return (
     <Card className="card-hover">
@@ -187,6 +189,64 @@ function BalanceAreaChart({ data }: { data: Array<{ month: string; income: numbe
   )
 }
 
+function FixedExpensesChart({ data }: { data: Array<{ month: string; value: number }> }) {
+  if (!data?.length) {
+    return (
+      <div className="flex h-[350px] items-center justify-center text-muted-foreground text-sm">
+        Nenhum histórico de despesas fixas encontrado para este ano.
+      </div>
+    )
+  }
+  return (
+    <ResponsiveContainer width="100%" height={350}>
+      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+        <XAxis
+          dataKey="month"
+          axisLine={false}
+          tickLine={false}
+          tick={{ fontSize: 12, fill: "#6b7280" }}
+          dy={10}
+        />
+        <YAxis
+          axisLine={false}
+          tickLine={false}
+          tick={{ fontSize: 12, fill: "#6b7280" }}
+          tickFormatter={(value) => `R$ ${value / 1000}k`}
+          dx={-10}
+        />
+        <Tooltip
+          content={({ active, payload, label }) => {
+            if (active && payload && payload.length) {
+              return (
+                <div className="rounded-lg border bg-white p-3 shadow-lg">
+                  <p className="font-medium mb-2">{label}</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="h-2 w-2 rounded-full bg-rose-500" />
+                    <span className="text-muted-foreground">Despesas Fixas ATIVAS</span>
+                    <span className="font-medium ml-auto">
+                      {formatCurrency(payload[0].value as number)}
+                    </span>
+                  </div>
+                </div>
+              )
+            }
+            return null
+          }}
+        />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke="#f43f5e"
+          strokeWidth={3}
+          dot={{ r: 4, fill: "#f43f5e", strokeWidth: 0 }}
+          activeDot={{ r: 6, fill: "#f43f5e", stroke: "#fff", strokeWidth: 2 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 function CategoryDonutChart({ data }: { data: Array<{ name: string; value: number; color: string }> }) {
   const total = data.reduce((acc, curr) => acc + curr.value, 0)
 
@@ -298,6 +358,7 @@ export default function DashboardPage() {
   const monthlyExpense = apiData?.monthlyExpense ?? 0
   const monthlyBalance = apiData?.monthlyBalance ?? 0
   const monthlyChartData = apiData?.monthlySummary ?? []
+  const fixedChartData = (apiData as any)?.fixedExpensesSummary ?? []
   const recentList = apiData?.recentTransactions ?? []
   const categoryChartData = apiData?.categorySummary ?? []
 
@@ -333,32 +394,32 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Saldo Total"
-          value={totalBalance}
-          change={12.5}
-          icon={Wallet}
-        />
-        <KPICard
-          title="Receitas do Mês"
-          value={monthlyIncome}
-          change={8.3}
-          icon={ArrowUpRight}
-        />
-        <KPICard
-          title="Despesas do Mês"
-          value={monthlyExpense}
-          change={-5.2}
-          icon={ArrowDownRight}
-        />
-        <KPICard
-          title="Balanço Líquido"
-          value={monthlyBalance}
-          change={15.7}
-          icon={DollarSign}
-        />
-      </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <KPICard
+            title="Saldo Total"
+            value={totalBalance}
+            change={12.5}
+            icon={Wallet}
+          />
+          <KPICard
+            title="Receitas do Mês"
+            value={monthlyIncome}
+            change={8.3}
+            icon={ArrowUpRight}
+          />
+          <KPICard
+            title="Despesas do Mês"
+            value={monthlyExpense}
+            change={-5.2}
+            icon={ArrowDownRight}
+          />
+          <KPICard
+            title="Balanço Líquido"
+            value={monthlyBalance}
+            change={15.7}
+            icon={DollarSign}
+          />
+        </div>
       )}
 
       {/* Charts Row */}
@@ -403,29 +464,42 @@ export default function DashboardPage() {
           <CardContent>
             <CategoryDonutChart data={categoryChartData} />
             {categoryChartData.length > 0 && (
-            <div className="mt-4 space-y-2">
-              {categoryChartData.map((category) => (
-                <div
-                  key={category.name}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <span className="text-muted-foreground">{category.name}</span>
+              <div className="mt-4 space-y-2">
+                {categoryChartData.map((category) => (
+                  <div
+                    key={category.name}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span className="text-muted-foreground">{category.name}</span>
+                    </div>
+                    <span className="font-medium">
+                      {formatCurrency(category.value)}
+                    </span>
                   </div>
-                  <span className="font-medium">
-                    {formatCurrency(category.value)}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Fixed Expenses Line Chart Row */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Evolução de Despesas Fixas</CardTitle>
+          <CardDescription>
+            Como suas obrigações fixas vêm crescendo (ou diminuindo) ao longo dos últimos 12 meses
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FixedExpensesChart data={fixedChartData} />
+        </CardContent>
+      </Card>
 
       {/* Bottom Row */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -495,11 +569,10 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span
-                          className={`font-medium ${
-                            transaction.type === "income"
+                          className={`font-medium ${transaction.type === "income"
                               ? "text-emerald-600"
                               : "text-rose-600"
-                          }`}
+                            }`}
                         >
                           {transaction.type === "income" ? "+" : ""}
                           {formatCurrency(transaction.amount)}
