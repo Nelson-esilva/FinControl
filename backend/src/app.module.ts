@@ -9,10 +9,13 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { UploadModule } from './upload/upload.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
     PrismaModule,
+    UploadModule,
     AuthModule,
     DashboardModule,
     UsersModule,
@@ -23,5 +26,6 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificationsModule,
     AttachmentsModule,
   ],
+  controllers: [HealthController],
 })
-export class AppModule {}
+export class AppModule { }

@@ -11,17 +11,44 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { diskStorage, memoryStorage } from 'multer';
+import { extname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { UsersService } from './users.service';
+import { UploadService } from '../upload/upload.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const AVATAR_DIR = 'uploads/avatars';
 
+/** Retorna o storage correto: memoryStorage (Cloudinary) ou diskStorage (dev local) */
+function avatarStorage() {
+  const useCloud = !!(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+  if (useCloud) {
+    return memoryStorage();
+  }
+  // Dev local — garante que a pasta exista
+  if (!existsSync(AVATAR_DIR)) mkdirSync(AVATAR_DIR, { recursive: true });
+  return diskStorage({
+    destination: AVATAR_DIR,
+    filename: (req, file, cb) => {
+      const id = (req as any).params.id;
+      const ext = extname(file.originalname) || '.jpg';
+      cb(null, `${id}-${Date.now()}${ext}`);
+    },
+  });
+}
+
 @Controller('users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly uploadService: UploadService,
+  ) { }
 
   @Post()
   create(@Body() dto: CreateUserDto) {
@@ -46,14 +73,7 @@ export class UsersController {
   @Post(':id/avatar')
   @UseInterceptors(
     FileInterceptor('avatar', {
-      storage: diskStorage({
-        destination: AVATAR_DIR,
-        filename: (req, file, cb) => {
-          const id = (req as any).params.id;
-          const ext = extname(file.originalname) || '.jpg';
-          cb(null, `${id}-${Date.now()}${ext}`);
-        },
-      }),
+      storage: avatarStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
       fileFilter: (_, file, cb) => {
         const allowed = /\.(jpe?g|png|webp|gif)$/i.test(file.originalname);
@@ -66,9 +86,9 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('Nenhum arquivo enviado');
-    const avatarUrl = `/uploads/avatars/${file.filename}`;
-    await this.users.update(id, { avatar: avatarUrl });
-    return { avatar: avatarUrl };
+    const result = await this.uploadService.upload(file, 'avatars');
+    await this.users.update(id, { avatar: result.url });
+    return { avatar: result.url };
   }
 
   @Delete(':id')
@@ -76,3 +96,4 @@ export class UsersController {
     return this.users.remove(id);
   }
 }
+
