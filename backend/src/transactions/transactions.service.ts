@@ -1,49 +1,83 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { TransactionType } from '@prisma/client';
+import { TransactionType, TransactionStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const USER_ID = 'user-id';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(dto: CreateTransactionDto) {
-    const amount = new Decimal(dto.amount);
-    const balanceChange = dto.type === TransactionType.INCOME ? dto.amount : -dto.amount;
+    const totalInstallments = dto.totalInstallments && dto.totalInstallments > 1 ? dto.totalInstallments : 1;
+
+    const totalAmount = typeof dto.amount === 'string' ? parseFloat(dto.amount) : dto.amount;
+    const baseAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
+    const remainder = Math.round((totalAmount - baseAmount * totalInstallments) * 100) / 100;
+
     return this.prisma.$transaction(async (tx) => {
-      const transaction = await tx.transaction.create({
-        data: {
+      let firstTransactionId = null;
+      let firstTransaction = null;
+
+      for (let i = 1; i <= totalInstallments; i++) {
+        const isFirst = i === 1;
+        // O primeiro mês absorve os centavos restantes para fechar a conta
+        const installmentAmount = isFirst ? baseAmount + remainder : baseAmount;
+
+        const date = new Date(dto.date);
+        date.setMonth(date.getMonth() + (i - 1));
+
+        const status: TransactionStatus = isFirst ? (dto.status ?? 'COMPLETED') : 'SCHEDULED';
+
+        const data: any = {
           userId: USER_ID,
           accountId: dto.accountId,
           categoryId: dto.categoryId,
-          amount,
-          date: new Date(dto.date),
-          description: dto.description,
+          amount: new Decimal(installmentAmount),
+          date,
+          description: totalInstallments > 1 ? `${dto.description} (${i}/${totalInstallments})` : dto.description,
           type: dto.type,
-          status: dto.status ?? 'COMPLETED',
-          installmentNumber: dto.installmentNumber,
-          totalInstallments: dto.totalInstallments,
+          status,
+          installmentNumber: totalInstallments > 1 ? i : dto.installmentNumber,
+          totalInstallments: totalInstallments > 1 ? totalInstallments : dto.totalInstallments,
           isRecurring: dto.isRecurring ?? false,
           recurringFrequency: dto.recurringFrequency,
-        },
-      });
-      await tx.account.update({
-        where: { id: dto.accountId },
-        data: { currentBalance: { increment: balanceChange } },
-      });
-      return transaction;
+        };
+
+        if (!isFirst && firstTransactionId) {
+          data.parentTransactionId = firstTransactionId;
+        }
+
+        const transaction = await tx.transaction.create({ data });
+
+        if (isFirst) {
+          firstTransactionId = transaction.id;
+          firstTransaction = transaction;
+        }
+
+        if (status === 'COMPLETED') {
+          const balanceChange = dto.type === TransactionType.INCOME ? installmentAmount : -installmentAmount;
+          await tx.account.update({
+            where: { id: dto.accountId },
+            data: { currentBalance: { increment: balanceChange } },
+          });
+        }
+      }
+
+      return firstTransaction;
     });
   }
 
-  findAll(filters?: { type?: TransactionType; accountId?: string; categoryId?: string; from?: string; to?: string }) {
+  findAll(filters?: { type?: TransactionType; accountId?: string; categoryId?: string; from?: string; to?: string; status?: TransactionStatus; parentTransactionId?: string }) {
     const where: Record<string, unknown> = { userId: USER_ID };
     if (filters?.type) where.type = filters.type;
     if (filters?.accountId) where.accountId = filters.accountId;
     if (filters?.categoryId) where.categoryId = filters.categoryId;
+    if (filters?.status) where.status = filters.status;
+    if (filters?.parentTransactionId) where.parentTransactionId = filters.parentTransactionId;
     if (filters?.from || filters?.to) {
       where.date = {};
       if (filters.from) (where.date as Record<string, Date>).gte = new Date(filters.from);
@@ -52,14 +86,14 @@ export class TransactionsService {
     return this.prisma.transaction.findMany({
       where,
       include: { account: true, category: true },
-      orderBy: { date: 'desc' },
+      orderBy: { date: 'asc' },
     });
   }
 
   findOne(id: string) {
     return this.prisma.transaction.findFirstOrThrow({
       where: { id, userId: USER_ID },
-      include: { account: true, category: true, attachments: true },
+      include: { account: true, category: true, attachments: true, childTransactions: true },
     });
   }
 
@@ -67,27 +101,57 @@ export class TransactionsService {
     const existing = await this.prisma.transaction.findFirstOrThrow({
       where: { id, userId: USER_ID },
     });
-    let balanceAdjustment = 0;
-    if (dto.amount !== undefined || dto.type !== undefined) {
-      const oldAmount = Number(existing.amount);
-      balanceAdjustment += existing.type === TransactionType.INCOME ? -oldAmount : oldAmount;
-      const newAmount = dto.amount ?? oldAmount;
-      const newType = dto.type ?? existing.type;
-      balanceAdjustment += newType === TransactionType.INCOME ? newAmount : -newAmount;
-    }
-    const data: Record<string, unknown> = { ...dto };
-    if (dto.amount != null) data.amount = new Decimal(dto.amount);
-    if (dto.date) data.date = new Date(dto.date);
 
-    // Use interactive transaction (callback) so conditional account update is valid
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.transaction.update({ where: { id }, data });
-      if (balanceAdjustment !== 0) {
+      // Se estava concluída, reverte o saldo antes de atualizar
+      if (existing.status === 'COMPLETED') {
+        const revertAdjustment = existing.type === TransactionType.INCOME ? -Number(existing.amount) : Number(existing.amount);
         await tx.account.update({
           where: { id: existing.accountId },
-          data: { currentBalance: { increment: balanceAdjustment } },
+          data: { currentBalance: { increment: revertAdjustment } },
         });
       }
+
+      const data: Record<string, unknown> = { ...dto };
+      if (dto.amount != null) data.amount = new Decimal(dto.amount);
+      if (dto.date) data.date = new Date(dto.date);
+
+      const updated = await tx.transaction.update({ where: { id }, data });
+
+      // Se a nova transação ou situação ficou como concluída, aplica o saldo
+      if (updated.status === 'COMPLETED') {
+        const applyAdjustment = updated.type === TransactionType.INCOME ? Number(updated.amount) : -Number(updated.amount);
+        await tx.account.update({
+          where: { id: updated.accountId },
+          data: { currentBalance: { increment: applyAdjustment } },
+        });
+      }
+
+      return updated;
+    });
+  }
+
+  async pay(id: string) {
+    const existing = await this.prisma.transaction.findFirstOrThrow({
+      where: { id, userId: USER_ID },
+    });
+
+    if (existing.status === 'COMPLETED') {
+      throw new BadRequestException('Transaction is already paid');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: { status: 'COMPLETED' },
+      });
+
+      const applyAdjustment = updated.type === TransactionType.INCOME ? Number(updated.amount) : -Number(updated.amount);
+      await tx.account.update({
+        where: { id: updated.accountId },
+        data: { currentBalance: { increment: applyAdjustment } },
+      });
+
       return updated;
     });
   }
@@ -96,14 +160,17 @@ export class TransactionsService {
     const tx = await this.prisma.transaction.findFirstOrThrow({
       where: { id, userId: USER_ID },
     });
-    const balanceRevert = tx.type === TransactionType.INCOME
-      ? -Number(tx.amount)
-      : Number(tx.amount);
+
     return this.prisma.$transaction(async (prismaTx) => {
-      await prismaTx.account.update({
-        where: { id: tx.accountId },
-        data: { currentBalance: { increment: balanceRevert } },
-      });
+      if (tx.status === 'COMPLETED') {
+        const balanceRevert = tx.type === TransactionType.INCOME
+          ? -Number(tx.amount)
+          : Number(tx.amount);
+        await prismaTx.account.update({
+          where: { id: tx.accountId },
+          data: { currentBalance: { increment: balanceRevert } },
+        });
+      }
       return prismaTx.transaction.delete({ where: { id } });
     });
   }

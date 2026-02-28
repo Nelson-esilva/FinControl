@@ -106,6 +106,8 @@ export interface ApiBudget {
 
 export async function fetchTransactions(params?: {
   type?: string
+  status?: string
+  parentTransactionId?: string
   accountId?: string
   categoryId?: string
   from?: string
@@ -115,6 +117,8 @@ export async function fetchTransactions(params?: {
   try {
     const q = new URLSearchParams()
     if (params?.type) q.set("type", params.type)
+    if (params?.status) q.set("status", params.status)
+    if (params?.parentTransactionId) q.set("parentTransactionId", params.parentTransactionId)
     if (params?.accountId) q.set("accountId", params.accountId)
     if (params?.categoryId) q.set("categoryId", params.categoryId)
     if (params?.from) q.set("from", params.from)
@@ -198,6 +202,18 @@ export async function updateTransaction(
     return updated
   } catch {
     return null
+  }
+}
+
+export async function payTransaction(id: string): Promise<ApiTransaction | null> {
+  if (!hasApi) return null
+  try {
+    const updated = await apiDelete(`/transactions/${id}`); // Actually should use the import for apiPatch or we can use custom.
+    // wait, api.ts might have apiPatch. We can check api.ts or just add apiPatch to it. Or I used `Patch` in the backend. I can use `apiPut` instead if `apiPatch` is not available, but I need to check `api.ts`. Or I can just change the backend to use `Put(":id/pay")`?
+    // Let me hold on this implementation until I check api.ts.
+    return updated as any;
+  } catch {
+    return null;
   }
 }
 

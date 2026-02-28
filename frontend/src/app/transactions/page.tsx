@@ -70,6 +70,7 @@ import {
   createTransaction as apiCreateTransaction,
   updateTransaction as apiUpdateTransaction,
   deleteTransaction as apiDeleteTransaction,
+  payTransaction as apiPayTransaction,
   hasApi,
   toNum,
 } from "@/lib/api-data"
@@ -583,6 +584,14 @@ export default function TransactionsPage() {
     if (ok) refetchTransactions()
   }
 
+  const handlePay = async (row: TransactionRow) => {
+    if (!hasApi) return
+    if (!window.confirm("Confirmar o pagamento desta operação? O saldo da conta será atualizado.")) return
+    const updated = await apiPayTransaction(row.id)
+    if (updated) refetchTransactions()
+    else alert("Erro ao tentar baixar a parcela, verifique se já não encontra-se paga.")
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -668,11 +677,10 @@ export default function TransactionsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Balanço</p>
                 <p
-                  className={`text-xl font-bold ${
-                    totalIncome - totalExpense >= 0
+                  className={`text-xl font-bold ${totalIncome - totalExpense >= 0
                       ? "text-emerald-600"
                       : "text-rose-600"
-                  }`}
+                    }`}
                 >
                   {formatCurrency(totalIncome - totalExpense)}
                 </p>
@@ -801,95 +809,100 @@ export default function TransactionsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-              filteredTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {formatDate(transaction.date)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">
-                        {transaction.description}
-                      </span>
-                      {transaction.installmentNumber && (
-                        <span className="text-xs text-muted-foreground">
-                          Parcela {transaction.installmentNumber} de{" "}
-                          {transaction.totalInstallments}
+                filteredTransactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {formatDate(transaction.date)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {transaction.description}
                         </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="gap-1"
-                      style={{
-                        borderColor: transaction.category.color,
-                        color: transaction.category.color,
-                      }}
-                    >
-                      <div
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: transaction.category.color }}
-                      />
-                      {transaction.category.name}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-muted-foreground" />
-                      {transaction.account.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`font-medium ${
-                        transaction.type === "INCOME"
-                          ? "text-emerald-600"
-                          : "text-rose-600"
-                      }`}
-                    >
-                      {transaction.type === "INCOME" ? "+" : ""}
-                      {formatCurrency(transaction.amount)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={transaction.status} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {transaction.hasAttachment && (
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => hasApi && setEditingTransaction(transaction)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Ver Anexo
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDelete(transaction)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+                        {transaction.installmentNumber && (
+                          <span className="text-xs text-muted-foreground">
+                            Parcela {transaction.installmentNumber} de{" "}
+                            {transaction.totalInstallments}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="gap-1"
+                        style={{
+                          borderColor: transaction.category.color,
+                          color: transaction.category.color,
+                        }}
+                      >
+                        <div
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: transaction.category.color }}
+                        />
+                        {transaction.category.name}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                        {transaction.account.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`font-medium ${transaction.type === "INCOME"
+                            ? "text-emerald-600"
+                            : "text-rose-600"
+                          }`}
+                      >
+                        {transaction.type === "INCOME" ? "+" : ""}
+                        {formatCurrency(transaction.amount)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={transaction.status} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {transaction.hasAttachment && (
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {transaction.status !== "COMPLETED" && (
+                              <DropdownMenuItem className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 cursor-pointer" onClick={() => handlePay(transaction)}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Marcar Pago
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => hasApi && setEditingTransaction(transaction)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled>
+                              <FileText className="mr-2 h-4 w-4" />
+                              Ver Anexo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDelete(transaction)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
