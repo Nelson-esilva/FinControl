@@ -7,11 +7,11 @@ const USER_ID = 'user-id';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   create(dto: CreateCategoryDto) {
     return this.prisma.category.create({
-      data: { ...dto, userId: USER_ID },
+      data: { ...dto, userId: USER_ID } as any,
     });
   }
 
@@ -31,7 +31,7 @@ export class CategoriesService {
   update(id: string, dto: UpdateCategoryDto) {
     return this.prisma.category.update({
       where: { id },
-      data: dto,
+      data: dto as any,
     });
   }
 

@@ -138,6 +138,7 @@ model Transaction {
   parentTransaction Transaction?  @relation("Installments", fields: [parentTransactionId], references: [id])
   childTransactions Transaction[] @relation("Installments")
   recurringExpense  RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
+  metadata    Json?
 
   @@index([userId, date])
   @@index([userId, type])
@@ -265,6 +266,7 @@ model RecurringExpense {
   account    Account? @relation(fields: [accountId], references: [id])
   accountId  String?  @map("account_id")
   transactions Transaction[]
+  metadata   Json?
 
   @@index([userId, status])
   @@index([userId, type])

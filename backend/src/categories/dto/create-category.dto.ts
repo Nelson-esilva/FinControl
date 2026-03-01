@@ -1,5 +1,4 @@
-import { IsOptional, IsString, IsBoolean, IsEnum } from 'class-validator';
-import { TransactionType } from '@prisma/client';
+import { IsOptional, IsString, IsBoolean, IsIn } from 'class-validator';
 
 export class CreateCategoryDto {
   @IsString()
@@ -9,8 +8,9 @@ export class CreateCategoryDto {
   @IsString()
   description?: string;
 
-  @IsEnum(TransactionType)
-  type: TransactionType;
+  @IsString()
+  @IsIn(['INCOME', 'EXPENSE'])
+  type: string;
 
   @IsOptional()
   @IsString()

@@ -27,6 +27,7 @@ model User {
   categories    Category[]
   budgets       Budget[]
   notifications Notification[]
+  recurringExpenses RecurringExpense[]
 
   @@map("users")
 }
@@ -61,6 +62,7 @@ model Account {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String        @map("user_id")
   transactions Transaction[]
+  recurringExpenses RecurringExpense[]
 
   @@map("accounts")
 }
@@ -88,6 +90,7 @@ model Category {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String        @map("user_id")
   transactions Transaction[]
+  recurringExpenses RecurringExpense[]
   budgets      Budget[]
 
   @@unique([userId, name, type])
@@ -141,6 +144,7 @@ model Transaction {
   parentTransaction Transaction?  @relation("Installments", fields: [parentTransactionId], references: [id])
   childTransactions Transaction[] @relation("Installments")
   recurringExpense  RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
+  metadata          Json?
 
   @@index([userId, date])
   @@index([userId, type])
@@ -218,4 +222,61 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+// ============================================
+// RECURRING EXPENSES
+// ============================================
+enum RecurringType {
+  FIXED
+  INSTALLMENT
+  CREDIT_CARD
+  LOAN
+  SUBSCRIPTION
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+model RecurringExpense {
+  id                  String             @id @default(uuid())
+  name                String
+  description         String?
+  type                RecurringType
+  status              RecurringStatus    @default(ACTIVE)
+  amount              Decimal            @db.Decimal(15, 2)
+  frequency           RecurringFrequency @default(MONTHLY)
+  dueDay              Int?               @map("due_day")              // dia do vencimento (1-31)
+  startDate           DateTime           @map("start_date")
+  endDate             DateTime?          @map("end_date")             // null = sem prazo (despesa fixa)
+  currentInstallment  Int?               @map("current_installment")
+  totalInstallments   Int?               @map("total_installments")
+  interestRate        Decimal?           @map("interest_rate") @db.Decimal(5, 2) // juros p/ empréstimos
+  cardName            String?            @map("card_name")            // nome do cartão
+  color               String             @default("#6366f1")
+  icon                String             @default("Repeat")
+  nextDueDate         DateTime?          @map("next_due_date")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  category   Category? @relation(fields: [categoryId], references: [id])
+  categoryId String?  @map("category_id")
+  account    Account? @relation(fields: [accountId], references: [id])
+  accountId  String?  @map("account_id")
+  transactions Transaction[]
+  metadata   Json?
+
+  @@index([userId, status])
+  @@index([userId, type])
+  @@map("recurring_expenses")
 }

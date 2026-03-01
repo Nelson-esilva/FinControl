@@ -73,6 +73,7 @@ export interface ApiTransaction {
   categoryId: string
   account?: { name: string; id: string; type?: string }
   category?: { name: string; id: string; color?: string }
+  metadata?: Record<string, any> | null
 }
 
 export interface ApiAccount {
@@ -173,6 +174,7 @@ export async function createTransaction(body: {
   categoryId: string
   installmentNumber?: number
   totalInstallments?: number
+  metadata?: Record<string, any>
 }): Promise<ApiTransaction | null> {
   if (!hasApi) return null
   try {
@@ -195,6 +197,7 @@ export async function updateTransaction(
     categoryId?: string
     installmentNumber?: number
     totalInstallments?: number
+    metadata?: Record<string, any>
   }
 ): Promise<ApiTransaction | null> {
   if (!hasApi) return null

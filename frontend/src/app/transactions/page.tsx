@@ -129,6 +129,7 @@ type TransactionFormInitial = {
   status: string
   installmentNumber?: number | null
   totalInstallments?: number | null
+  metadata?: Record<string, any> | null
 }
 
 function TransactionForm({
@@ -153,9 +154,12 @@ function TransactionForm({
   const [type, setType] = useState<"INCOME" | "EXPENSE">(initialTransaction?.type ?? "EXPENSE")
   const [accountId, setAccountId] = useState(initialTransaction?.accountId ?? "")
   const [categoryId, setCategoryId] = useState(initialTransaction?.categoryId ?? "")
+  const [customCategory, setCustomCategory] = useState(initialTransaction?.metadata?.customCategory ?? "")
   const [status, setStatus] = useState(initialTransaction?.status ?? "COMPLETED")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
+  const isOtherCategory = formCategories.find(c => c.id === categoryId)?.name.toLowerCase() === "outros";
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -206,6 +210,7 @@ function TransactionForm({
         status: status as "COMPLETED" | "PENDING" | "SCHEDULED",
         accountId,
         categoryId,
+        metadata: isOtherCategory && customCategory.trim() ? { customCategory: customCategory.trim() } : undefined,
       }
       if (isEdit && initialTransaction) {
         const updated = await apiUpdateTransaction(initialTransaction.id, body)
@@ -292,6 +297,16 @@ function TransactionForm({
             </SelectContent>
           </Select>
         </div>
+        {isOtherCategory && (
+          <div className="space-y-2 col-span-2">
+            <Label>Nome da Categoria (Personalizado)</Label>
+            <Input
+              placeholder="Digite o nome da categoria..."
+              value={customCategory}
+              onChange={(e) => setCustomCategory(e.target.value)}
+            />
+          </div>
+        )}
         <div className="space-y-2">
           <Label>Conta</Label>
           <Select value={accountId} onValueChange={setAccountId}>
@@ -459,6 +474,7 @@ type TransactionRow = {
   totalInstallments: number | null
   categoryId?: string
   accountId?: string
+  metadata?: Record<string, any> | null
 }
 
 export default function TransactionsPage() {
@@ -505,6 +521,7 @@ export default function TransactionsPage() {
           totalInstallments: (t as { totalInstallments?: number | null }).totalInstallments ?? null,
           categoryId: t.categoryId ?? (t.category as { id?: string })?.id,
           accountId: t.accountId ?? (t.account as { id?: string })?.id,
+          metadata: t.metadata,
         }))
       )
       setApiAccounts(accs.map((a) => ({ id: a.id, name: a.name, type: (a as { type?: string }).type })))
@@ -537,6 +554,7 @@ export default function TransactionsPage() {
           totalInstallments: (t as { totalInstallments?: number | null }).totalInstallments ?? null,
           categoryId: t.categoryId ?? (t.category as { id?: string })?.id,
           accountId: t.accountId ?? (t.account as { id?: string })?.id,
+          metadata: t.metadata,
         }))
       )
     )
@@ -575,6 +593,7 @@ export default function TransactionsPage() {
     status: row.status,
     installmentNumber: row.installmentNumber,
     totalInstallments: row.totalInstallments,
+    metadata: row.metadata,
   })
 
   const handleDelete = async (row: TransactionRow) => {
@@ -678,8 +697,8 @@ export default function TransactionsPage() {
                 <p className="text-sm text-muted-foreground">Balanço</p>
                 <p
                   className={`text-xl font-bold ${totalIncome - totalExpense >= 0
-                      ? "text-emerald-600"
-                      : "text-rose-600"
+                    ? "text-emerald-600"
+                    : "text-rose-600"
                     }`}
                 >
                   {formatCurrency(totalIncome - totalExpense)}
@@ -840,7 +859,7 @@ export default function TransactionsPage() {
                           className="h-1.5 w-1.5 rounded-full"
                           style={{ backgroundColor: transaction.category.color }}
                         />
-                        {transaction.category.name}
+                        {transaction.metadata?.customCategory ? `Outros (${transaction.metadata.customCategory})` : transaction.category.name}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -852,8 +871,8 @@ export default function TransactionsPage() {
                     <TableCell>
                       <span
                         className={`font-medium ${transaction.type === "INCOME"
-                            ? "text-emerald-600"
-                            : "text-rose-600"
+                          ? "text-emerald-600"
+                          : "text-rose-600"
                           }`}
                       >
                         {transaction.type === "INCOME" ? "+" : ""}
