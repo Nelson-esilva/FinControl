@@ -1,9 +1,35 @@
-import { 
-  AccountType, 
-  TransactionType, 
-  TransactionStatus, 
-  NotificationType 
-} from "@prisma/client"
+export const AccountType = {
+  CHECKING: 'CHECKING',
+  SAVINGS: 'SAVINGS',
+  INVESTMENT: 'INVESTMENT',
+  CREDIT_CARD: 'CREDIT_CARD',
+  WALLET: 'WALLET',
+  OTHER: 'OTHER'
+} as const;
+export type AccountType = typeof AccountType[keyof typeof AccountType];
+
+export const TransactionType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+  TRANSFER: 'TRANSFER'
+} as const;
+export type TransactionType = typeof TransactionType[keyof typeof TransactionType];
+
+export const TransactionStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  SCHEDULED: 'SCHEDULED'
+} as const;
+export type TransactionStatus = typeof TransactionStatus[keyof typeof TransactionStatus];
+
+export const NotificationType = {
+  BUDGET_ALERT: 'BUDGET_ALERT',
+  DUE_DATE: 'DUE_DATE',
+  SYSTEM: 'SYSTEM',
+  TRANSACTION: 'TRANSACTION'
+} as const;
+export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
 
 // ============================================
 // USER TYPES
