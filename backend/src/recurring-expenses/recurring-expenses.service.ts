@@ -250,16 +250,27 @@ export class RecurringExpensesService {
                 throw new Error("AccountId é obrigatório para pagamento.");
             }
 
+            let catId = expense.categoryId;
+            if (!catId) {
+                const fallbackCat = await tx.category.findFirst({
+                    where: { userId: USER_ID, type: expense.type }
+                });
+                if (!fallbackCat) {
+                    throw new Error("Nenhuma categoria vinculada ou encontrada. Crie uma categoria antes de pagar.");
+                }
+                catId = fallbackCat.id;
+            }
+
             const trans = await tx.transaction.create({
                 data: {
                     userId: USER_ID,
                     accountId: chosenAccountId,
-                    categoryId: expense.categoryId || undefined,
+                    categoryId: catId,
                     amount: expense.amount,
                     date: txDate,
                     description: `Pagamento: ${expense.name}`,
-                    type: 'EXPENSE',
-                    status: 'COMPLETED',
+                    type: expense.type,
+                    status: "COMPLETED",
                     isRecurring: true,
                     recurringExpenseId: expense.id
                 }
