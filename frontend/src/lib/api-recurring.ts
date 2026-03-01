@@ -129,3 +129,39 @@ export async function deleteRecurringExpense(id: string): Promise<boolean> {
         return false
     }
 }
+
+export interface ApiBill {
+    id: string
+    recurringExpenseId: string
+    name: string
+    description: string | null
+    type: string
+    amount: number | { toNumber?: () => number }
+    color: string
+    icon: string
+    dueDate: string
+    isPaid: boolean
+    transactionId: string | null
+    category?: { id: string; name: string; color?: string } | null
+    account?: { id: string; name: string; } | null
+}
+
+export async function fetchBills(month: string): Promise<ApiBill[]> {
+    if (!hasApi) return []
+    try {
+        const list = await apiGet<ApiBill[]>(`/recurring-expenses/bills/${month}`)
+        return Array.isArray(list) ? list : []
+    } catch {
+        return []
+    }
+}
+
+export async function payBill(id: string, month: string, accountId?: string): Promise<boolean> {
+    if (!hasApi) return false
+    try {
+        await apiPost(`/recurring-expenses/${id}/pay`, { month, accountId })
+        return true
+    } catch {
+        return false
+    }
+}

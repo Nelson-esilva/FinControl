@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsEnum } from 'class-validator';
 import { TransactionType } from '@prisma/client';
 
 export class CreateCategoryDto {

@@ -22,6 +22,20 @@ export class RecurringExpensesController {
         return this.service.getSummary();
     }
 
+    @Get('bills/:month')
+    getBills(@Param('month') month: string) {
+        return this.service.getBills(month);
+    }
+
+    @Post(':id/pay')
+    payBill(
+        @Param('id') id: string,
+        @Body('month') month: string,
+        @Body('accountId') accountId?: string
+    ) {
+        return this.service.payBill(id, month, accountId);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string) {
         return this.service.findOne(id);

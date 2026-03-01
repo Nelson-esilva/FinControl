@@ -124,6 +124,7 @@ model Transaction {
   parentTransactionId String?           @map("parent_transaction_id")
   isRecurring         Boolean           @default(false) @map("is_recurring")
   recurringFrequency  String?           @map("recurring_frequency")
+  recurringExpenseId  String?           @map("recurring_expense_id")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
@@ -136,6 +137,7 @@ model Transaction {
   attachments Attachment[]
   parentTransaction Transaction?  @relation("Installments", fields: [parentTransactionId], references: [id])
   childTransactions Transaction[] @relation("Installments")
+  recurringExpense  RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([userId, type])
@@ -262,6 +264,7 @@ model RecurringExpense {
   categoryId String?  @map("category_id")
   account    Account? @relation(fields: [accountId], references: [id])
   accountId  String?  @map("account_id")
+  transactions Transaction[]
 
   @@index([userId, status])
   @@index([userId, type])

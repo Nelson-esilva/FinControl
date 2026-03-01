@@ -22,6 +22,7 @@ import {
   ChevronRight,
   PiggyBank,
   TrendingDown,
+  CalendarDays,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
@@ -36,6 +37,12 @@ const navigation = [
     href: "/dashboard",
     icon: LayoutDashboard,
     description: "Visão geral das finanças",
+  },
+  {
+    name: "Contas a Pagar",
+    href: "/payable",
+    icon: CalendarDays,
+    description: "Dívidas e faturas do mês",
   },
   {
     name: "Transações",
@@ -56,10 +63,10 @@ const navigation = [
     description: "Metas e limites",
   },
   {
-    name: "Despesas",
+    name: "Despesas Fixas",
     href: "/expenses",
     icon: TrendingDown,
-    description: "Fixas, parcelamentos e empréstimos",
+    description: "Organizar parcelamentos",
   },
 ]
 

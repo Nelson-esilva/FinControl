@@ -11,7 +11,7 @@ export class RecurringExpensesService {
     constructor(private readonly prisma: PrismaService) { }
 
     create(dto: CreateRecurringExpenseDto) {
-        return this.prisma.$transaction(async (tx) => {
+        return this.prisma.$transaction(async (tx: any) => {
             const recurring = await tx.recurringExpense.create({
                 data: {
                     userId: USER_ID,
@@ -147,5 +147,131 @@ export class RecurringExpensesService {
             loansCount: loans.length,
             totalCount: expenses.length,
         };
+    }
+
+    /** Busca as contas a pagar para um mês específico (YYYY-MM) */
+    async getBills(month: string) {
+        // month: "2026-03"
+        const [yearStr, monthStr] = month.split('-');
+        const year = parseInt(yearStr);
+        const m = parseInt(monthStr) - 1;
+
+        const startOfMonth = new Date(year, m, 1);
+        const endOfMonth = new Date(year, m + 1, 0, 23, 59, 59, 999);
+
+        // 1. Buscar gastos fixos ativos que se aplicam a este mês
+        const expenses = await this.prisma.recurringExpense.findMany({
+            where: {
+                userId: USER_ID,
+                status: 'ACTIVE',
+                startDate: { lte: endOfMonth },
+                OR: [
+                    { endDate: null },
+                    { endDate: { gte: startOfMonth } }
+                ]
+            },
+            include: { category: true, account: true }
+        });
+
+        // 2. Buscar transações neste mês atreladas a essas despesas
+        const transactions = await this.prisma.transaction.findMany({
+            where: {
+                userId: USER_ID,
+                recurringExpenseId: { not: null },
+                date: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                }
+            }
+        });
+
+        const txByExpenseId = new Map(transactions.map((t: any) => [t.recurringExpenseId, t]));
+
+        // 3. Montar a resposta
+        return expenses.map((exp: any) => {
+            let dueDay = exp.dueDay || startOfMonth.getDate();
+            // Evitar dia 31 num mês de 30 etc
+            if (dueDay > endOfMonth.getDate()) dueDay = endOfMonth.getDate();
+
+            const dueDate = new Date(year, m, dueDay);
+            const tx: any = txByExpenseId.get(exp.id);
+
+            return {
+                id: `bill-${exp.id}-${month}`,
+                recurringExpenseId: exp.id,
+                name: exp.name,
+                description: exp.description,
+                type: exp.type,
+                amount: exp.amount,
+                color: exp.color,
+                icon: exp.icon,
+                dueDate: dueDate.toISOString(),
+                isPaid: !!tx,
+                transactionId: tx?.id || null,
+                category: exp.category,
+                account: exp.account,
+            };
+        });
+    }
+
+    /** Marca uma despesa como paga neste mês, gerando a transação */
+    async payBill(id: string, month: string, accountId?: string) {
+        return this.prisma.$transaction(async (tx: any) => {
+            const expense = await tx.recurringExpense.findFirstOrThrow({
+                where: { id, userId: USER_ID }
+            });
+
+            const [yearStr, monthStr] = month.split('-');
+            const year = parseInt(yearStr);
+            const m = parseInt(monthStr) - 1;
+
+            const startOfMonth = new Date(year, m, 1);
+            const endOfMonth = new Date(year, m + 1, 0, 23, 59, 59, 999);
+
+            // Verifica se já não pagou
+            const existingTx = await tx.transaction.findFirst({
+                where: {
+                    userId: USER_ID,
+                    recurringExpenseId: id,
+                    date: { gte: startOfMonth, lte: endOfMonth }
+                }
+            });
+
+            if (existingTx) {
+                throw new Error("Conta já paga para este mês.");
+            }
+
+            let dueDay = expense.dueDay || startOfMonth.getDate();
+            if (dueDay > endOfMonth.getDate()) dueDay = endOfMonth.getDate();
+            const txDate = new Date(year, m, dueDay);
+
+            const chosenAccountId = accountId || expense.accountId;
+            if (!chosenAccountId) {
+                throw new Error("AccountId é obrigatório para pagamento.");
+            }
+
+            const trans = await tx.transaction.create({
+                data: {
+                    userId: USER_ID,
+                    accountId: chosenAccountId,
+                    categoryId: expense.categoryId || undefined,
+                    amount: expense.amount,
+                    date: txDate,
+                    description: `Pagamento: ${expense.name}`,
+                    type: 'EXPENSE',
+                    status: 'COMPLETED',
+                    isRecurring: true,
+                    recurringExpenseId: expense.id
+                }
+            });
+
+            // Atualiza saldo
+            await tx.account.update({
+                where: { id: chosenAccountId },
+                data: { currentBalance: { decrement: expense.amount } }
+            });
+
+            return trans;
+        });
     }
 }
