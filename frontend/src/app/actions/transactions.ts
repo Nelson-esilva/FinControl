@@ -4,7 +4,22 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
-import { TransactionType, TransactionStatus } from "@prisma/client"
+
+const TransactionType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+  TRANSFER: 'TRANSFER'
+} as const;
+
+type TransactionType = typeof TransactionType[keyof typeof TransactionType];
+
+const TransactionStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED'
+} as const;
+
+type TransactionStatus = typeof TransactionStatus[keyof typeof TransactionStatus];
 
 // ============================================
 // VALIDATION SCHEMAS
@@ -14,8 +29,8 @@ const transactionSchema = z.object({
   amount: z.number().positive("O valor deve ser maior que zero"),
   date: z.date(),
   description: z.string().min(1, "Descrição é obrigatória"),
-  type: z.nativeEnum(TransactionType),
-  status: z.nativeEnum(TransactionStatus).default(TransactionStatus.COMPLETED),
+  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER'] as const),
+  status: z.string().default('COMPLETED'),
   accountId: z.string().uuid("Conta inválida"),
   categoryId: z.string().uuid("Categoria inválida"),
   installmentNumber: z.number().optional(),
@@ -55,7 +70,7 @@ export async function createTransaction(
     const validatedData = transactionSchema.parse(input)
 
     // Start transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create transaction
       const transaction = await tx.transaction.create({
         data: {
@@ -150,7 +165,7 @@ export async function updateTransaction(
     const validatedData = updateTransactionSchema.parse(input)
     const { id, ...updateData } = validatedData
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Get original transaction
       const originalTransaction = await tx.transaction.findUnique({
         where: { id },
@@ -234,7 +249,7 @@ export async function updateTransaction(
 
 export async function deleteTransaction(id: string): Promise<ActionResponse> {
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Get transaction
       const transaction = await tx.transaction.findUnique({
         where: { id },
@@ -306,8 +321,8 @@ export async function getTransactions(filters?: {
           filters?.endDate ? { date: { lte: filters.endDate } } : {},
           filters?.categoryId ? { categoryId: filters.categoryId } : {},
           filters?.accountId ? { accountId: filters.accountId } : {},
-          filters?.type ? { type: filters.type } : {},
-          filters?.status ? { status: filters.status } : {},
+          filters?.type ? { type: filters.type as any } : {},
+          filters?.status ? { status: filters.status as any } : {},
         ],
       },
       include: {
@@ -434,7 +449,7 @@ export async function deleteAttachment(id: string): Promise<ActionResponse> {
 // ============================================
 
 async function checkBudgetAlerts(
-  tx: Prisma.TransactionClient,
+  tx: any,
   categoryId: string,
   amount: number
 ) {
@@ -524,7 +539,7 @@ export async function getDashboardData(): Promise<ActionResponse> {
       where: { isActive: true },
     })
     const totalBalance = accounts.reduce(
-      (acc, account) => acc + account.currentBalance.toNumber(),
+      (acc: any, account: any) => acc + account.currentBalance.toNumber(),
       0
     )
 
