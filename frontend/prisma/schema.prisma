@@ -76,6 +76,7 @@ enum TransactionType {
 model Category {
   id          String          @id @default(uuid())
   name        String
+  description String?
   type        TransactionType
   color       String          @default("#6366f1")
   icon        String          @default("Tag")

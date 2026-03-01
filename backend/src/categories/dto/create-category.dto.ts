@@ -5,6 +5,10 @@ export class CreateCategoryDto {
   @IsString()
   name: string;
 
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @IsEnum(TransactionType)
   type: TransactionType;
 

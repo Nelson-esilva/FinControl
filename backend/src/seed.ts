@@ -52,6 +52,7 @@ async function main() {
         { userId: user.id, name: 'Alimentação', type: 'EXPENSE', color: '#f43f5e' },
         { userId: user.id, name: 'Transporte', type: 'EXPENSE', color: '#f59e0b' },
         { userId: user.id, name: 'Lazer', type: 'EXPENSE', color: '#06b6d4' },
+        { userId: user.id, name: 'Outros', description: 'gasto fixo', type: 'EXPENSE', color: '#6b7280' },
       ],
     });
   }
