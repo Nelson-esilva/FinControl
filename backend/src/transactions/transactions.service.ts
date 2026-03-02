@@ -2,7 +2,6 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { TransactionType, TransactionStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const USER_ID = 'user-id';
@@ -30,7 +29,7 @@ export class TransactionsService {
         const date = new Date(dto.date);
         date.setMonth(date.getMonth() + (i - 1));
 
-        const status: TransactionStatus = isFirst ? (dto.status ?? 'COMPLETED') : 'SCHEDULED';
+        const status: string = isFirst ? (dto.status ?? 'COMPLETED') : 'SCHEDULED';
 
         const data: any = {
           userId: USER_ID,
@@ -45,6 +44,7 @@ export class TransactionsService {
           totalInstallments: totalInstallments > 1 ? totalInstallments : dto.totalInstallments,
           isRecurring: dto.isRecurring ?? false,
           recurringFrequency: dto.recurringFrequency,
+          metadata: dto.metadata,
         };
 
         if (!isFirst && firstTransactionId) {
@@ -59,7 +59,7 @@ export class TransactionsService {
         }
 
         if (status === 'COMPLETED') {
-          const balanceChange = dto.type === TransactionType.INCOME ? installmentAmount : -installmentAmount;
+          const balanceChange = dto.type === 'INCOME' ? installmentAmount : -installmentAmount;
           await tx.account.update({
             where: { id: dto.accountId },
             data: { currentBalance: { increment: balanceChange } },
@@ -67,11 +67,64 @@ export class TransactionsService {
         }
       }
 
+      if (dto.type === 'PAYMENT' && dto.metadata?.isCreditCardPayment && firstTransactionId) {
+        const dateObj = new Date(dto.date);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth();
+
+        const startOfMonth = new Date(year, month, 1);
+        const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+        const creditCardBills = await tx.recurringExpense.findMany({
+          where: { userId: USER_ID, type: 'CREDIT_CARD' }
+        });
+
+        for (const bill of creditCardBills) {
+          const existingTx = await tx.transaction.findFirst({
+            where: {
+              userId: USER_ID,
+              recurringExpenseId: bill.id,
+              date: { gte: startOfMonth, lte: endOfMonth }
+            }
+          });
+
+          if (!existingTx) {
+            let dueDay = bill.dueDay || startOfMonth.getDate();
+            if (dueDay > endOfMonth.getDate()) dueDay = endOfMonth.getDate();
+            const txDate = new Date(year, month, dueDay);
+
+            let catId = bill.categoryId;
+            if (!catId) {
+              const fallbackCat = await tx.category.findFirst({
+                where: { userId: USER_ID, type: "EXPENSE" }
+              });
+              catId = fallbackCat?.id || dto.categoryId;
+            }
+
+            await tx.transaction.create({
+              data: {
+                userId: USER_ID,
+                accountId: dto.accountId,
+                categoryId: catId,
+                amount: bill.amount,
+                date: txDate,
+                description: `Pagamento: ${bill.name}`,
+                type: 'EXPENSE',
+                status: 'COMPLETED',
+                isRecurring: true,
+                recurringExpenseId: bill.id,
+                metadata: { isHidden: true, parentPaymentId: firstTransactionId }
+              }
+            });
+          }
+        }
+      }
+
       return firstTransaction;
     });
   }
 
-  findAll(filters?: { type?: TransactionType; accountId?: string; categoryId?: string; from?: string; to?: string; status?: TransactionStatus; parentTransactionId?: string }) {
+  findAll(filters?: { type?: string; accountId?: string; categoryId?: string; from?: string; to?: string; status?: string; parentTransactionId?: string }) {
     const where: Record<string, unknown> = { userId: USER_ID };
     if (filters?.type) where.type = filters.type;
     if (filters?.accountId) where.accountId = filters.accountId;
@@ -105,7 +158,7 @@ export class TransactionsService {
     return this.prisma.$transaction(async (tx) => {
       // Se estava concluída, reverte o saldo antes de atualizar
       if (existing.status === 'COMPLETED') {
-        const revertAdjustment = existing.type === TransactionType.INCOME ? -Number(existing.amount) : Number(existing.amount);
+        const revertAdjustment = existing.type === 'INCOME' ? -Number(existing.amount) : Number(existing.amount);
         await tx.account.update({
           where: { id: existing.accountId },
           data: { currentBalance: { increment: revertAdjustment } },
@@ -120,7 +173,7 @@ export class TransactionsService {
 
       // Se a nova transação ou situação ficou como concluída, aplica o saldo
       if (updated.status === 'COMPLETED') {
-        const applyAdjustment = updated.type === TransactionType.INCOME ? Number(updated.amount) : -Number(updated.amount);
+        const applyAdjustment = updated.type === 'INCOME' ? Number(updated.amount) : -Number(updated.amount);
         await tx.account.update({
           where: { id: updated.accountId },
           data: { currentBalance: { increment: applyAdjustment } },
@@ -146,7 +199,7 @@ export class TransactionsService {
         data: { status: 'COMPLETED' },
       });
 
-      const applyAdjustment = updated.type === TransactionType.INCOME ? Number(updated.amount) : -Number(updated.amount);
+      const applyAdjustment = updated.type === 'INCOME' ? Number(updated.amount) : -Number(updated.amount);
       await tx.account.update({
         where: { id: updated.accountId },
         data: { currentBalance: { increment: applyAdjustment } },
@@ -163,7 +216,7 @@ export class TransactionsService {
 
     return this.prisma.$transaction(async (prismaTx) => {
       if (tx.status === 'COMPLETED') {
-        const balanceRevert = tx.type === TransactionType.INCOME
+        const balanceRevert = tx.type === 'INCOME'
           ? -Number(tx.amount)
           : Number(tx.amount);
         await prismaTx.account.update({

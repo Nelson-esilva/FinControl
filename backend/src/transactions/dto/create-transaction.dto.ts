@@ -1,5 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, IsBoolean, IsUUID, IsDateString } from 'class-validator';
-import { TransactionType, TransactionStatus } from '@prisma/client';
+import { IsNumber, IsOptional, IsString, IsBoolean, IsUUID, IsDateString, IsIn } from 'class-validator';
 
 export class CreateTransactionDto {
   @IsNumber()
@@ -11,12 +10,14 @@ export class CreateTransactionDto {
   @IsString()
   description: string;
 
-  @IsEnum(TransactionType)
-  type: TransactionType;
+  @IsString()
+  @IsIn(['INCOME', 'EXPENSE', 'PAYMENT'])
+  type: string;
 
   @IsOptional()
-  @IsEnum(TransactionStatus)
-  status?: TransactionStatus;
+  @IsString()
+  @IsIn(['PENDING', 'COMPLETED', 'CANCELLED', 'SCHEDULED'])
+  status?: string;
 
   @IsUUID()
   accountId: string;
@@ -39,4 +40,7 @@ export class CreateTransactionDto {
   @IsOptional()
   @IsString()
   recurringFrequency?: string;
+
+  @IsOptional()
+  metadata?: Record<string, any>;
 }

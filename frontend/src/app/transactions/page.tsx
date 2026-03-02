@@ -122,7 +122,7 @@ type TransactionFormInitial = {
   id: string
   amount: number
   description: string
-  type: "INCOME" | "EXPENSE"
+  type: "INCOME" | "EXPENSE" | "PAYMENT"
   accountId: string
   categoryId: string
   date: Date
@@ -151,13 +151,15 @@ function TransactionForm({
   const [attachments, setAttachments] = useState<File[]>([])
   const [amount, setAmount] = useState(initialTransaction ? String(Math.abs(initialTransaction.amount)) : "")
   const [description, setDescription] = useState(initialTransaction?.description ?? "")
-  const [type, setType] = useState<"INCOME" | "EXPENSE">(initialTransaction?.type ?? "EXPENSE")
+  const [type, setType] = useState<"INCOME" | "EXPENSE" | "PAYMENT">(initialTransaction?.type as any ?? "EXPENSE")
   const [accountId, setAccountId] = useState(initialTransaction?.accountId ?? "")
   const [categoryId, setCategoryId] = useState(initialTransaction?.categoryId ?? "")
   const [customCategory, setCustomCategory] = useState(initialTransaction?.metadata?.customCategory ?? "")
   const [status, setStatus] = useState(initialTransaction?.status ?? "COMPLETED")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
+  const [isCreditCardPayment, setIsCreditCardPayment] = useState(initialTransaction?.metadata?.isCreditCardPayment ?? false)
 
   const isOtherCategory = formCategories.find(c => c.id === categoryId)?.name.toLowerCase() === "outros";
 
@@ -210,7 +212,10 @@ function TransactionForm({
         status: status as "COMPLETED" | "PENDING" | "SCHEDULED",
         accountId,
         categoryId,
-        metadata: isOtherCategory && customCategory.trim() ? { customCategory: customCategory.trim() } : undefined,
+        metadata: {
+          ...(isOtherCategory && customCategory.trim() ? { customCategory: customCategory.trim() } : {}),
+          ...(type === "PAYMENT" && isCreditCardPayment ? { isCreditCardPayment: true } : {})
+        }
       }
       if (isEdit && initialTransaction) {
         const updated = await apiUpdateTransaction(initialTransaction.id, body)
@@ -244,13 +249,14 @@ function TransactionForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Tipo</Label>
-          <Select value={type} onValueChange={(v) => setType(v as "INCOME" | "EXPENSE")}>
+          <Select value={type} onValueChange={(v) => setType(v as "INCOME" | "EXPENSE" | "PAYMENT")}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="EXPENSE">Despesa</SelectItem>
               <SelectItem value="INCOME">Receita</SelectItem>
+              <SelectItem value="PAYMENT">Pagamento</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -373,6 +379,17 @@ function TransactionForm({
         />
         <Label htmlFor="installment">Compra parcelada</Label>
       </div>
+
+      {type === "PAYMENT" && (
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="credit_card_payment"
+            checked={isCreditCardPayment}
+            onCheckedChange={setIsCreditCardPayment}
+          />
+          <Label htmlFor="credit_card_payment">Cartão de Crédito</Label>
+        </div>
+      )}
 
       {isInstallment && (
         <div className="grid grid-cols-2 gap-4">
@@ -579,14 +596,14 @@ export default function TransactionsPage() {
     .reduce((acc, t) => acc + (t.amount > 0 ? t.amount : 0), 0)
 
   const totalExpense = filteredTransactions
-    .filter((t) => t.type === "EXPENSE")
+    .filter((t) => t.type === "EXPENSE" || t.type === "PAYMENT")
     .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 
   const toFormInitial = (row: TransactionRow): TransactionFormInitial => ({
     id: row.id,
     amount: Math.abs(row.amount),
     description: row.description,
-    type: row.type as "INCOME" | "EXPENSE",
+    type: row.type as "INCOME" | "EXPENSE" | "PAYMENT",
     accountId: row.accountId ?? listAccounts.find((a) => a.name === row.account.name)?.id ?? "",
     categoryId: row.categoryId ?? listCategories.find((c) => c.name === row.category.name)?.id ?? "",
     date: row.date,
@@ -783,6 +800,7 @@ export default function TransactionsPage() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="INCOME">Receita</SelectItem>
                 <SelectItem value="EXPENSE">Despesa</SelectItem>
+                <SelectItem value="PAYMENT">Pagamento</SelectItem>
               </SelectContent>
             </Select>
 
@@ -872,11 +890,13 @@ export default function TransactionsPage() {
                       <span
                         className={`font-medium ${transaction.type === "INCOME"
                           ? "text-emerald-600"
-                          : "text-rose-600"
+                          : transaction.type === "PAYMENT"
+                            ? "text-indigo-600"
+                            : "text-rose-600"
                           }`}
                       >
-                        {transaction.type === "INCOME" ? "+" : ""}
-                        {formatCurrency(transaction.amount)}
+                        {transaction.type === "INCOME" ? "+" : "-"}
+                        {formatCurrency(Math.abs(transaction.amount))}
                       </span>
                     </TableCell>
                     <TableCell>

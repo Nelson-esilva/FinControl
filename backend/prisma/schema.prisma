@@ -79,6 +79,7 @@ model Account {
 enum TransactionType {
   INCOME
   EXPENSE
+  PAYMENT
 }
 
 model Category {

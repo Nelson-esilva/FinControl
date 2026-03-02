@@ -109,16 +109,26 @@ export class RecurringExpensesService {
         return this.prisma.recurringExpense.delete({ where: { id } });
     }
 
-    /** Calcula a próxima data de vencimento */
-    private calculateNextDueDate(startDate: string, dueDay?: number): Date {
+    /** Calcula a próxima data de vencimento (horário fixo ao meio-dia UTC para evitar bug de fuso) */
+    private calculateNextDueDate(startDate: string | Date, dueDay?: number): Date {
         const now = new Date();
         const start = new Date(startDate);
-        const day = dueDay ?? start.getDate();
-        let next = new Date(now.getFullYear(), now.getMonth(), day);
-        if (next <= now) {
-            next.setMonth(next.getMonth() + 1);
+        const day = dueDay ?? start.getUTCDate();
+
+        // Se a despesa começa no futuro, usamos o mês de início como base
+        const baseDate = start > now ? start : now;
+
+        let nextYear = baseDate.getFullYear();
+        let nextMonth = baseDate.getMonth();
+        let next = new Date(nextYear, nextMonth, day);
+
+        if (next <= now && start <= now) {
+            nextMonth += 1;
+            next = new Date(nextYear, nextMonth, day);
         }
-        return next;
+
+        // Retorna 12:00 UTC para estabilizar o dia independentemente do fuso do usuário
+        return new Date(Date.UTC(next.getFullYear(), next.getMonth(), next.getDate(), 12, 0, 0));
     }
 
     /** Resumo para dashboard */
@@ -156,8 +166,8 @@ export class RecurringExpensesService {
         const year = parseInt(yearStr);
         const m = parseInt(monthStr) - 1;
 
-        const startOfMonth = new Date(year, m, 1);
-        const endOfMonth = new Date(year, m + 1, 0, 23, 59, 59, 999);
+        const startOfMonth = new Date(Date.UTC(year, m, 1, 0, 0, 0));
+        const endOfMonth = new Date(Date.UTC(year, m + 1, 0, 23, 59, 59, 999));
 
         // 1. Buscar gastos fixos ativos que se aplicam a este mês
         const expenses = await this.prisma.recurringExpense.findMany({
@@ -191,9 +201,10 @@ export class RecurringExpensesService {
         return expenses.map((exp: any) => {
             let dueDay = exp.dueDay || startOfMonth.getDate();
             // Evitar dia 31 num mês de 30 etc
-            if (dueDay > endOfMonth.getDate()) dueDay = endOfMonth.getDate();
+            if (dueDay > new Date(year, m + 1, 0).getDate()) dueDay = new Date(year, m + 1, 0).getDate();
 
-            const dueDate = new Date(year, m, dueDay);
+            // Setamos meio-dia UTC para evitar que voltem um dia por causa do fuso!
+            const dueDate = new Date(Date.UTC(year, m, dueDay, 12, 0, 0));
             const tx: any = txByExpenseId.get(exp.id);
 
             return {
