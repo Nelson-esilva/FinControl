@@ -165,3 +165,13 @@ export async function payBill(id: string, month: string, accountId?: string): Pr
         return false
     }
 }
+
+export async function undoPayBill(id: string, month: string): Promise<boolean> {
+    if (!hasApi) return false
+    try {
+        await apiPost(`/recurring-expenses/${id}/undo-pay`, { month })
+        return true
+    } catch {
+        return false
+    }
+}

@@ -31,10 +31,11 @@ import {
     CreditCard,
     Landmark,
     Tv,
-    ArrowRight
+    ArrowRight,
+    Undo2
 } from "lucide-react"
 
-import { fetchBills, payBill, type ApiBill } from "@/lib/api-recurring"
+import { fetchBills, payBill, undoPayBill, type ApiBill } from "@/lib/api-recurring"
 import { fetchAccounts, type ApiAccount, hasApi } from "@/lib/api-data"
 import { formatCurrency } from "@/lib/utils"
 
@@ -114,6 +115,18 @@ export default function PayablePage() {
             loadData()
         } else {
             alert("Erro ao tentar pagar a conta.")
+        }
+    }
+
+    const handleUndoPay = async (billId: string, recurringId: string) => {
+        if (!confirm("Tem certeza que deseja desfazer o pagamento desta conta? O saldo voltará para sua conta.")) return
+        setIsProcessing(true)
+        const success = await undoPayBill(recurringId, monthStr)
+        setIsProcessing(false)
+        if (success) {
+            loadData()
+        } else {
+            alert("Erro ao tentar desfazer pagamento.")
         }
     }
 
@@ -332,9 +345,21 @@ export default function PayablePage() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-0 flex gap-1 items-center shadow-none">
-                                            Pago
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-0 flex gap-1 items-center shadow-none">
+                                                Pago
+                                            </Badge>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                onClick={() => handleUndoPay(bill.id, bill.recurringExpenseId)}
+                                                disabled={isProcessing}
+                                                title="Desfazer pagamento"
+                                            >
+                                                <Undo2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 )
                             })}

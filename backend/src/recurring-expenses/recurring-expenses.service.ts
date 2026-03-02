@@ -285,4 +285,43 @@ export class RecurringExpensesService {
             return trans;
         });
     }
+
+    /** Desfaz o pagamento de uma despesa recorrente neste mês, removendo a transação gerada */
+    async undoPayBill(id: string, month: string) {
+        return this.prisma.$transaction(async (tx: any) => {
+            const [yearStr, monthStr] = month.split('-');
+            const year = parseInt(yearStr);
+            const m = parseInt(monthStr) - 1;
+
+            const startOfMonth = new Date(year, m, 1);
+            const endOfMonth = new Date(year, m + 1, 0, 23, 59, 59, 999);
+
+            const existingTx = await tx.transaction.findFirst({
+                where: {
+                    userId: USER_ID,
+                    recurringExpenseId: id,
+                    date: { gte: startOfMonth, lte: endOfMonth }
+                }
+            });
+
+            if (!existingTx) {
+                throw new Error("Nenhum pagamento encontrado para este mês.");
+            }
+
+            // Exclui a transação correspondente
+            await tx.transaction.delete({
+                where: { id: existingTx.id }
+            });
+
+            // Reembolsa o saldo
+            if (existingTx.accountId) {
+                await tx.account.update({
+                    where: { id: existingTx.accountId },
+                    data: { currentBalance: { increment: existingTx.amount } }
+                });
+            }
+
+            return { success: true };
+        });
+    }
 }

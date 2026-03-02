@@ -36,6 +36,14 @@ export class RecurringExpensesController {
         return this.service.payBill(id, month, accountId);
     }
 
+    @Post(':id/undo-pay')
+    undoPayBill(
+        @Param('id') id: string,
+        @Body('month') month: string
+    ) {
+        return this.service.undoPayBill(id, month);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string) {
         return this.service.findOne(id);
