@@ -44,17 +44,27 @@ async function main() {
     });
   }
 
-  const countCategories = await prisma.category.count({ where: { userId: user.id } });
-  if (countCategories === 0) {
-    await prisma.category.createMany({
-      data: [
-        { userId: user.id, name: 'Salário', type: 'INCOME', color: '#10b981' },
-        { userId: user.id, name: 'Alimentação', type: 'EXPENSE', color: '#f43f5e' },
-        { userId: user.id, name: 'Transporte', type: 'EXPENSE', color: '#f59e0b' },
-        { userId: user.id, name: 'Lazer', type: 'EXPENSE', color: '#06b6d4' },
-        { userId: user.id, name: 'Outros', description: 'gasto fixo', type: 'EXPENSE', color: '#6b7280' },
-      ],
+  const defaultCategories = [
+    { name: 'Salário', type: 'INCOME', color: '#10b981' },
+    { name: 'Alimentação', type: 'EXPENSE', color: '#f43f5e' },
+    { name: 'Transporte', type: 'EXPENSE', color: '#f59e0b' },
+    { name: 'Saúde', type: 'EXPENSE', color: '#ec4899' },
+    { name: 'Educação', type: 'EXPENSE', color: '#8b5cf6' },
+    { name: 'Moradia', type: 'EXPENSE', color: '#6366f1' },
+    { name: 'Lazer', type: 'EXPENSE', color: '#06b6d4' },
+    { name: 'Imprevistos', type: 'EXPENSE', color: '#ef4444' },
+    { name: 'Outros', description: 'gasto fixo', type: 'EXPENSE', color: '#6b7280' },
+  ];
+
+  for (const cat of defaultCategories) {
+    const existing = await prisma.category.findFirst({
+      where: { userId: user.id, name: cat.name, type: cat.type as any }
     });
+    if (!existing) {
+      await prisma.category.create({
+        data: { userId: user.id, name: cat.name, type: cat.type as any, color: cat.color, description: cat.description }
+      });
+    }
   }
 }
 

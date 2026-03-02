@@ -253,7 +253,7 @@ export class RecurringExpensesService {
             let catId = expense.categoryId;
             if (!catId) {
                 const fallbackCat = await tx.category.findFirst({
-                    where: { userId: USER_ID, type: expense.type }
+                    where: { userId: USER_ID, type: "EXPENSE" }
                 });
                 if (!fallbackCat) {
                     throw new Error("Nenhuma categoria vinculada ou encontrada. Crie uma categoria antes de pagar.");
@@ -269,7 +269,7 @@ export class RecurringExpensesService {
                     amount: expense.amount,
                     date: txDate,
                     description: `Pagamento: ${expense.name}`,
-                    type: expense.type,
+                    type: "EXPENSE",
                     status: "COMPLETED",
                     isRecurring: true,
                     recurringExpenseId: expense.id
