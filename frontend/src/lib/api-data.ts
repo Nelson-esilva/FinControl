@@ -398,4 +398,14 @@ export async function uploadProfileAvatar(userId: string, file: File): Promise<{
   }
 }
 
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ ok: boolean; message?: string }> {
+  if (!hasApi) return { ok: false, message: 'API não configurada.' }
+  try {
+    const res = await apiPost<{ message: string }>("/auth/change-password", { userId, currentPassword, newPassword })
+    return { ok: true, message: res?.message }
+  } catch (err: any) {
+    return { ok: false, message: err?.response?.data?.message || err.message || 'Erro ao alterar a senha.' }
+  }
+}
+
 export { toNum, hasApi }

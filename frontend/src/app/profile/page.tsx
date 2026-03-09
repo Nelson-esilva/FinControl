@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { User, Camera } from "lucide-react"
+import { User, Camera, Eye, EyeOff } from "lucide-react"
 import {
   fetchProfile,
   updateProfile,
   uploadProfileAvatar,
+  changePassword,
   hasApi,
   type ApiProfile,
 } from "@/lib/api-data"
@@ -28,6 +29,13 @@ export default function ProfilePage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -80,6 +88,34 @@ export default function ProfilePage() {
       toast.success("Foto atualizada.")
     } else {
       toast.error("Não foi possível enviar a foto.")
+    }
+  }
+
+  async function handleSubmitPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!hasApi) {
+      toast.error("Configure a conexão com o servidor.")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("As senhas novas não coincidem.")
+      return
+    }
+    if (newPassword.length < 6) {
+      toast.error("A nova senha deve ter pelo menos 6 caracteres.")
+      return
+    }
+    setSavingPassword(true)
+    const result = await changePassword(userId, currentPassword, newPassword)
+    setSavingPassword(false)
+    
+    if (result.ok) {
+      toast.success("Senha atualizada com sucesso.")
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } else {
+      toast.error(result.message || "Erro ao atualizar senha.")
     }
   }
 
@@ -219,6 +255,67 @@ export default function ProfilePage() {
             </div>
             <Button type="submit" disabled={saving}>
               {saving ? "Salvando…" : "Salvar alterações"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Segurança</CardTitle>
+          <CardDescription>Gerencie sua senha de acesso</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitPassword} className="space-y-4 max-w-md">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Senha Atual</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type="text"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  disabled={savingPassword}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Nova Senha</Label>
+              <Input
+                id="newPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={savingPassword}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+              <Input
+                id="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Repita a nova senha"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={savingPassword}
+              />
+            </div>
+
+            <Button type="submit" variant="secondary" disabled={savingPassword || !currentPassword || !newPassword}>
+              {savingPassword ? "Atualizando..." : "Alterar Senha"}
             </Button>
           </form>
         </CardContent>

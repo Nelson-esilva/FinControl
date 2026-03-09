@@ -4,6 +4,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -27,8 +28,16 @@ export class AuthController {
     return this.auth.forgotPassword(dto.email);
   }
 
+
+
   @Post('reset-password')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.auth.resetPassword(dto.token, dto.newPassword);
   }
+
+  @Post('change-password')
+  async changePassword(@Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(dto.userId, dto.currentPassword, dto.newPassword);
+  }
 }
+
