@@ -1,0 +1,13 @@
+---
+description: Schema Prisma do FinControl — backend é a fonte da verdade.
+globs: "**/prisma/**/*.prisma"
+alwaysApply: false
+---
+
+# Prisma
+
+- Dono do schema: `backend/prisma/schema.prisma`. `frontend/prisma/schema.prisma` é cópia defasada (sem `UserRole`, senha, phone, reset).
+- Mudança de modelo: edite o backend; só alinhe o frontend se algum código legado ainda importar esse schema — e declare o desvio.
+- Tabelas mapeadas em snake_case (`@@map`). IDs UUID. Money: `@db.Decimal(15, 2)`.
+- Não rode `migrate`, `db push`, `db pull`, `generate` ou Studio sem o comando exato autorizado.
+- Relação `Category`→`Transaction` é `onDelete: Restrict`. Parcelas: self-relation `Installments`.

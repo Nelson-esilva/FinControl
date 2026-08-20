@@ -1,0 +1,13 @@
+---
+description: Economia de tokens e fluxo mínimo no FinControl. Sempre ativo.
+alwaysApply: true
+---
+
+# Economia de contexto
+
+- Fonte sempre ativa: `AGENTS.md`. Abra `.agents/*` e skills só quando mudarem a decisão.
+- Não leia `frontend/PROJECT_SUMMARY.md` (desatualizado). Não despeje README/docs no contexto.
+- Descubra com `rg`; abra só o arquivo-alvo, DTO/tipo, um vizinho e o consumidor do contrato.
+- Ignore `node_modules`, `.next`, `dist`, `uploads` e artefatos gerados.
+- Não instale dependências, não execute Prisma/Docker/SQL e não toque `.env*` sem pedido explícito.
+- Diff mínimo. Não refatore, não formate em massa e não “corrija” `USER_ID` hardcoded sem pedido.

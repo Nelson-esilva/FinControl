@@ -1,0 +1,14 @@
+---
+description: Invariantes de dinheiro, saldo, parcelas e despesas recorrentes.
+globs: "**/{transactions,accounts,budgets,recurring-expenses,dashboard,wallet,payable,expenses,budget}/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Dinheiro
+
+- Valores monetários nunca em `float` persistido. Use `Decimal` no Prisma; no JS, arredonde a 2 casas (centavos na 1ª parcela).
+- `COMPLETED` move saldo; `PENDING`/`SCHEDULED`/`CANCELLED` não. Delete/update deve reverter o efeito anterior.
+- Parcelamento: N transações atômicas; demais com `parentTransactionId`; status futuro = `SCHEDULED`.
+- `PAYMENT` + `metadata.isCreditCardPayment` quita fatura de `RecurringExpense` tipo `CREDIT_CARD`.
+- Recorrentes: `FIXED | INSTALLMENT | CREDIT_CARD | LOAN | SUBSCRIPTION`. Pagar/desfazer via `/recurring-expenses/:id/pay` e `undo-pay`.
+- Orçamento: alertas 80% e 100%. Não recrie regra de saldo no React.

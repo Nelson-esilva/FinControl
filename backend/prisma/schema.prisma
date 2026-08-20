@@ -37,8 +37,14 @@ model User {
   budgets           Budget[]
   notifications     Notification[]
   recurringExpenses RecurringExpense[]
+  pluggyItems       PluggyItem[]
 
   @@map("users")
+}
+
+enum DataSource {
+  MANUAL
+  PLUGGY
 }
 
 // ============================================
@@ -64,11 +70,16 @@ model Account {
   color           String      @default("#6366f1")
   icon            String      @default("Wallet")
   isActive        Boolean     @default(true) @map("is_active")
+  source          DataSource  @default(MANUAL)
+  pluggyAccountId String?     @unique @map("pluggy_account_id")
+  lastSyncedAt    DateTime?   @map("last_synced_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String        @map("user_id")
+  pluggyItem      PluggyItem? @relation(fields: [pluggyItemId], references: [id], onDelete: SetNull)
+  pluggyItemId    String?     @map("pluggy_item_id")
   transactions      Transaction[]
   recurringExpenses RecurringExpense[]
 
@@ -128,6 +139,8 @@ model Transaction {
   isRecurring         Boolean           @default(false) @map("is_recurring")
   recurringFrequency  String?           @map("recurring_frequency")
   recurringExpenseId  String?           @map("recurring_expense_id")
+  source              DataSource        @default(MANUAL)
+  pluggyTransactionId String?           @unique @map("pluggy_transaction_id")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
@@ -274,4 +287,33 @@ model RecurringExpense {
   @@index([userId, status])
   @@index([userId, type])
   @@map("recurring_expenses")
+}
+
+model PluggyItem {
+  id              String    @id @default(uuid())
+  pluggyItemId    String    @unique @map("pluggy_item_id")
+  connectorId     Int?      @map("connector_id")
+  connectorName   String?   @map("connector_name")
+  status          String?
+  executionStatus String?   @map("execution_status")
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  lastError       String?   @map("last_error")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String    @map("user_id")
+  accounts Account[]
+
+  @@index([userId])
+  @@map("pluggy_items")
+}
+
+model PluggyWebhookEvent {
+  id        String   @id @default(uuid())
+  eventId   String   @unique @map("event_id")
+  event     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("pluggy_webhook_events")
 }

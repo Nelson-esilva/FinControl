@@ -1,0 +1,15 @@
+---
+description: Padrões Next.js do frontend FinControl (App Router, API client, shadcn).
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Next.js
+
+- UI fala com Nest via `src/lib/api.ts` + `api-data.ts` / `api-recurring.ts`. Não crie outro `fetch`/Axios.
+- Não expanda `src/app/actions/` nem `src/lib/prisma.ts` — caminho legado. Regra de negócio nova vai no backend.
+- Componentes: `src/components/ui/` (shadcn) → layout em `src/components/layout/` → página. Alias `@/`.
+- Auth de tela: `useAuth()` + `AppShell`. Sessão em `localStorage` (`fincontrol_user`); APIs ainda sem Bearer.
+- Locale `pt-BR`, moeda BRL via `formatCurrency` / `formatDate` em `src/lib/utils.ts`. Tema claro/escuro via `next-themes`.
+- Tipos de domínio em `src/types/index.ts` devem acompanhar DTOs/enums do backend.
+- Rotas públicas de auth: manter `/login`, `/signup`, `/forgot-password` e `/reset-password` fora do shell autenticado.

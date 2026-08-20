@@ -35,6 +35,8 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
+  RefreshCw,
+  Unplug,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -42,7 +44,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { fetchAccounts, createAccount, updateAccount, deleteAccount, hasApi, toNum } from "@/lib/api-data"
+import { fetchAccounts, createAccount, updateAccount, deleteAccount, hasApi, toNum, fetchPluggyItems, registerPluggyItem, syncPluggyItem, unlinkPluggyItem } from "@/lib/api-data"
+import { toast } from "sonner"
+import { formatDate } from "@/lib/utils"
 
 const accountTypeConfig: Record<string, { label: string; icon: typeof Wallet }> = {
   CHECKING: { label: "Conta Corrente", icon: Landmark },
@@ -60,6 +64,8 @@ type AccountRow = {
   currentBalance: number
   creditLimit?: number
   color?: string
+  source?: string
+  isActive?: boolean
 }
 
 function AccountCard({ account, onEdit, onDelete }: { account: AccountRow; onEdit?: (account: AccountRow) => void; onDelete?: (account: AccountRow) => void }) {
@@ -86,9 +92,21 @@ function AccountCard({ account, onEdit, onDelete }: { account: AccountRow; onEdi
             </div>
             <div>
               <h3 className="font-semibold">{account.name}</h3>
-              <Badge variant="secondary" className="text-xs">
-                {config.label}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
+                <Badge variant="secondary" className="text-xs">
+                  {config.label}
+                </Badge>
+                {account.source === "PLUGGY" && (
+                  <Badge variant="outline" className="text-xs">
+                    Meu Pluggy
+                  </Badge>
+                )}
+                {account.isActive === false && (
+                  <Badge variant="secondary" className="text-xs text-muted-foreground">
+                    Inativa
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -279,12 +297,40 @@ function AccountForm({
   )
 }
 
+function nestErrorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback
+  try {
+    const parsed = JSON.parse(err.message) as { message?: string | string[] }
+    if (typeof parsed.message === "string") return parsed.message
+    if (Array.isArray(parsed.message)) return parsed.message.join(" ")
+  } catch {
+    /* corpo não é JSON */
+  }
+  return err.message || fallback
+}
+
+function mapAccountRows(list: { id: string; name: string; type: string; currentBalance: unknown; creditLimit?: unknown; color?: string; source?: string; isActive?: boolean }[]): AccountRow[] {
+  return list.map((a) => ({
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    currentBalance: toNum(a.currentBalance),
+    creditLimit: a.creditLimit != null ? toNum(a.creditLimit) : undefined,
+    color: a.color,
+    source: a.source,
+    isActive: a.isActive,
+  }))
+}
+
 export default function WalletPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null)
   const [activeTab, setActiveTab] = useState("all")
   const [accounts, setAccounts] = useState<AccountRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [itemIdInput, setItemIdInput] = useState("")
+  const [pluggyItems, setPluggyItems] = useState<Awaited<ReturnType<typeof fetchPluggyItems>>>([])
+  const [pluggyBusy, setPluggyBusy] = useState(false)
 
   const handleDelete = async (account: AccountRow) => {
     if (!hasApi) return
@@ -295,18 +341,10 @@ export default function WalletPage() {
 
   const refetch = () => {
     if (!hasApi) return
-    fetchAccounts().then((list) => {
-      setAccounts(
-        list.map((a) => ({
-          id: a.id,
-          name: a.name,
-          type: a.type,
-          currentBalance: toNum(a.currentBalance),
-          creditLimit: a.creditLimit != null ? toNum(a.creditLimit) : undefined,
-          color: a.color,
-        }))
-      )
-    })
+    fetchAccounts().then((list) => setAccounts(mapAccountRows(list)))
+    fetchPluggyItems()
+      .then(setPluggyItems)
+      .catch(() => setPluggyItems([]))
   }
 
   useEffect(() => {
@@ -314,22 +352,62 @@ export default function WalletPage() {
       setLoading(false)
       return
     }
-    fetchAccounts()
-      .then((list) => {
-        setAccounts(
-          list.map((a) => ({
-            id: a.id,
-            name: a.name,
-            type: a.type,
-            currentBalance: toNum(a.currentBalance),
-            creditLimit: a.creditLimit != null ? toNum(a.creditLimit) : undefined,
-            color: a.color,
-          }))
-        )
+    Promise.all([fetchAccounts(), fetchPluggyItems().catch(() => [])])
+      .then(([list, items]) => {
+        setAccounts(mapAccountRows(list))
+        setPluggyItems(items)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
+
+  const handleRegisterPluggy = async () => {
+    const itemId = itemIdInput.trim()
+    if (!itemId) {
+      toast.error("Cole o Item ID da aplicação demo.")
+      return
+    }
+    setPluggyBusy(true)
+    try {
+      const result = await registerPluggyItem(itemId)
+      toast.success(
+        `Importadas ${result.accountCount ?? result._count?.accounts ?? 0} contas e ${result.transactionCount ?? 0} lançamentos.`,
+      )
+      setItemIdInput("")
+      refetch()
+    } catch (err) {
+      toast.error(nestErrorMessage(err, "Falha ao sincronizar o Meu Pluggy."))
+    } finally {
+      setPluggyBusy(false)
+    }
+  }
+
+  const handleSyncPluggy = async (id: string) => {
+    setPluggyBusy(true)
+    try {
+      const result = await syncPluggyItem(id)
+      toast.success(`Sincronizado: ${result.accountCount ?? 0} contas, ${result.transactionCount ?? 0} lançamentos.`)
+      refetch()
+    } catch (err) {
+      toast.error(nestErrorMessage(err, "Falha ao sincronizar."))
+    } finally {
+      setPluggyBusy(false)
+    }
+  }
+
+  const handleUnlinkPluggy = async (id: string) => {
+    if (!window.confirm("Desvincular esta conexão? As contas importadas ficam inativas; o consentimento no Meu Pluggy permanece.")) return
+    setPluggyBusy(true)
+    try {
+      await unlinkPluggyItem(id)
+      toast.success("Conexão desvinculada.")
+      refetch()
+    } catch (err) {
+      toast.error(nestErrorMessage(err, "Falha ao desvincular."))
+    } finally {
+      setPluggyBusy(false)
+    }
+  }
 
   const filteredAccounts = activeTab === "all" ? accounts : accounts.filter((a) => a.type === activeTab)
 
@@ -383,6 +461,59 @@ export default function WalletPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {hasApi && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Meu Pluggy</CardTitle>
+            <CardDescription>
+              Cole o Item ID da aplicação demo. O consentimento permanece no Meu Pluggy.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={itemIdInput}
+                onChange={(e) => setItemIdInput(e.target.value)}
+                placeholder="Item ID (UUID)"
+                className="font-mono text-sm"
+                disabled={pluggyBusy}
+              />
+              <Button onClick={handleRegisterPluggy} disabled={pluggyBusy}>
+                {pluggyBusy ? "Sincronizando…" : "Sincronizar"}
+              </Button>
+            </div>
+            {pluggyItems.length > 0 && (
+              <ul className="space-y-2">
+                {pluggyItems.map((item) => (
+                  <li key={item.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm">
+                      <p className="font-medium">{item.connectorName ?? "Meu Pluggy"}</p>
+                      <p className="text-muted-foreground font-mono text-xs">{item.pluggyItemId}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {item.status ?? "—"}
+                        {item.lastSyncedAt ? ` · ${formatDate(item.lastSyncedAt)}` : ""}
+                        {item._count ? ` · ${item._count.accounts} contas` : ""}
+                      </p>
+                      {item.lastError && <p className="text-destructive text-xs">{item.lastError}</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" disabled={pluggyBusy} onClick={() => handleSyncPluggy(item.id)}>
+                        <RefreshCw className="mr-1 h-3 w-3" />
+                        Atualizar
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled={pluggyBusy} onClick={() => handleUnlinkPluggy(item.id)}>
+                        <Unplug className="mr-1 h-3 w-3" />
+                        Desvincular
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">

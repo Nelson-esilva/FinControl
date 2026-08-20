@@ -83,6 +83,9 @@ export interface ApiAccount {
   currentBalance: number | { toNumber?: () => number }
   creditLimit?: number | { toNumber?: () => number } | null
   color?: string
+  source?: string
+  isActive?: boolean
+  lastSyncedAt?: string | null
 }
 
 export interface ApiCategory {
@@ -409,3 +412,34 @@ export async function changePassword(userId: string, currentPassword: string, ne
 }
 
 export { toNum, hasApi }
+
+export interface ApiPluggyItem {
+  id: string
+  pluggyItemId: string
+  connectorName?: string | null
+  status?: string | null
+  executionStatus?: string | null
+  lastSyncedAt?: string | null
+  lastError?: string | null
+  accountCount?: number
+  transactionCount?: number
+  _count?: { accounts: number }
+}
+
+export async function fetchPluggyItems(): Promise<ApiPluggyItem[]> {
+  if (!hasApi) return []
+  const list = await apiGet<ApiPluggyItem[]>("/pluggy/items")
+  return Array.isArray(list) ? list : []
+}
+
+export async function registerPluggyItem(itemId: string): Promise<ApiPluggyItem> {
+  return apiPost<ApiPluggyItem>("/pluggy/items", { itemId })
+}
+
+export async function syncPluggyItem(id: string): Promise<ApiPluggyItem> {
+  return apiPost<ApiPluggyItem>(`/pluggy/items/${id}/sync`, {})
+}
+
+export async function unlinkPluggyItem(id: string): Promise<void> {
+  await apiDelete(`/pluggy/items/${id}`)
+}

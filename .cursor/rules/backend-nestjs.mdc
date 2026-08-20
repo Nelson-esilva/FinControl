@@ -1,0 +1,15 @@
+---
+description: Padrões NestJS do backend FinControl (módulos, DTO, PrismaService).
+globs: backend/**/*.{ts,json}
+alwaysApply: false
+---
+
+# Backend NestJS
+
+- Sequência: controller HTTP → DTO (`class-validator`) → service → `PrismaService` injetado. Não instancie `PrismaClient` local.
+- Novo domínio: módulo próprio + registro em `app.module.ts`. Reuse `PrismaModule` e `UploadModule`.
+- Money: `Decimal`; escritas compostas em `prisma.$transaction`. Só altere `currentBalance` se o status for `COMPLETED` (ou reversão equivalente).
+- Preserve `USER_ID = 'user-id'` até existir auth real nas rotas; não espalhe um segundo placeholder.
+- Enums canônicos: `INCOME | EXPENSE | PAYMENT` e `PENDING | COMPLETED | CANCELLED | SCHEDULED`. Não reintroduza `TRANSFER`.
+- Schema dono: `backend/prisma/schema.prisma`. Não execute `prisma generate/migrate/db *` sem autorização.
+- Validação: `npx tsc --noEmit` no backend; ESLint só nos arquivos alterados, sem `--fix` global.
