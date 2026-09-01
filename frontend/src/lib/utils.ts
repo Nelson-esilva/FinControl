@@ -13,6 +13,17 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
+/** Eixo de gráfico: R$ 850 / R$ 1,2 mil / R$ 1,5 mi */
+export function formatCompactCurrency(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
 // Format date to Brazilian format
 export function formatDate(date: Date | string): string {
   return new Intl.DateTimeFormat("pt-BR", {

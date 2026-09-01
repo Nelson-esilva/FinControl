@@ -20,7 +20,7 @@ import {
   Calendar,
   FileText,
 } from "lucide-react"
-import { formatCurrency, formatPercentage, formatRelativeDate } from "@/lib/utils"
+import { formatCurrency, formatPercentage, formatRelativeDate, formatCompactCurrency } from "@/lib/utils"
 import { fetchDashboard, type DashboardData } from "@/lib/api-data"
 import {
   AreaChart,
@@ -129,8 +129,9 @@ function BalanceAreaChart({ data }: { data: Array<{ month: string; income: numbe
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: "#6b7280" }}
-          tickFormatter={(value) => `R$ ${value / 1000}k`}
-          dx={-10}
+          tickFormatter={(value) => formatCompactCurrency(Number(value))}
+          width={72}
+          dx={-4}
         />
         <Tooltip
           content={({ active, payload, label }) => {
@@ -212,8 +213,9 @@ function FixedExpensesChart({ data }: { data: Array<{ month: string; value: numb
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: "#6b7280" }}
-          tickFormatter={(value) => `R$ ${value / 1000}k`}
-          dx={-10}
+          tickFormatter={(value) => formatCompactCurrency(Number(value))}
+          width={72}
+          dx={-4}
         />
         <Tooltip
           content={({ active, payload, label }) => {

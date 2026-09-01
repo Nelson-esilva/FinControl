@@ -111,9 +111,7 @@ export class DashboardService {
         else cur.expense += Number(t.amount);
       }
     });
-    const monthlySummary = Array.from(byMonth.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, v], idx) => {
+    const monthlySummary = Array.from(byMonth.entries()).map(([, v], idx) => {
         const d = new Date(now.getFullYear(), now.getMonth() - 11 + idx, 1);
         return {
           month: monthNames[d.getMonth()],
