@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -331,6 +331,7 @@ export default function WalletPage() {
   const [itemIdInput, setItemIdInput] = useState("")
   const [pluggyItems, setPluggyItems] = useState<Awaited<ReturnType<typeof fetchPluggyItems>>>([])
   const [pluggyBusy, setPluggyBusy] = useState(false)
+  const [showConnected, setShowConnected] = useState(false)
 
   const handleDelete = async (account: AccountRow) => {
     if (!hasApi) return
@@ -464,52 +465,65 @@ export default function WalletPage() {
 
       {hasApi && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Meu Pluggy</CardTitle>
-            <CardDescription>
-              Cole o Item ID da aplicação demo. O consentimento permanece no Meu Pluggy.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row">
+          <CardContent className="space-y-4 pt-6">
+            <div className="grid grid-cols-1 items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="space-y-1.5">
+                <CardTitle className="text-base">Meu Pluggy</CardTitle>
+                <CardDescription>
+                  Cole o Item ID da aplicação demo. O consentimento permanece no Meu Pluggy.
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto justify-self-start px-1 py-0 text-xs text-muted-foreground hover:text-foreground sm:justify-self-center"
+                onClick={() => setShowConnected((open) => !open)}
+              >
+                {showConnected ? "Ocultar conexões" : "Contas conectadas"}
+              </Button>
               <Input
                 value={itemIdInput}
                 onChange={(e) => setItemIdInput(e.target.value)}
                 placeholder="Item ID (UUID)"
-                className="font-mono text-sm"
+                className="font-mono text-sm self-end"
                 disabled={pluggyBusy}
               />
-              <Button onClick={handleRegisterPluggy} disabled={pluggyBusy}>
+              <Button className="justify-self-start sm:justify-self-center" onClick={handleRegisterPluggy} disabled={pluggyBusy}>
                 {pluggyBusy ? "Sincronizando…" : "Sincronizar"}
               </Button>
             </div>
-            {pluggyItems.length > 0 && (
-              <ul className="space-y-2">
-                {pluggyItems.map((item) => (
-                  <li key={item.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-sm">
-                      <p className="font-medium">{item.connectorName ?? "Meu Pluggy"}</p>
-                      <p className="text-muted-foreground font-mono text-xs">{item.pluggyItemId}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {item.status ?? "—"}
-                        {item.lastSyncedAt ? ` · ${formatDate(item.lastSyncedAt)}` : ""}
-                        {item._count ? ` · ${item._count.accounts} contas` : ""}
-                      </p>
-                      {item.lastError && <p className="text-destructive text-xs">{item.lastError}</p>}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" disabled={pluggyBusy} onClick={() => handleSyncPluggy(item.id)}>
-                        <RefreshCw className="mr-1 h-3 w-3" />
-                        Atualizar
-                      </Button>
-                      <Button variant="ghost" size="sm" disabled={pluggyBusy} onClick={() => handleUnlinkPluggy(item.id)}>
-                        <Unplug className="mr-1 h-3 w-3" />
-                        Desvincular
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+            {showConnected && (
+              pluggyItems.length > 0 ? (
+                <ul className="space-y-2">
+                  {pluggyItems.map((item) => (
+                    <li key={item.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm">
+                        <p className="font-medium">{item.connectorName ?? "Meu Pluggy"}</p>
+                        <p className="text-muted-foreground font-mono text-xs">{item.pluggyItemId}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {item.status ?? "—"}
+                          {item.lastSyncedAt ? ` · ${formatDate(item.lastSyncedAt)}` : ""}
+                          {item._count ? ` · ${item._count.accounts} contas` : ""}
+                        </p>
+                        {item.lastError && <p className="text-destructive text-xs">{item.lastError}</p>}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" disabled={pluggyBusy} onClick={() => handleSyncPluggy(item.id)}>
+                          <RefreshCw className="mr-1 h-3 w-3" />
+                          Atualizar
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={pluggyBusy} onClick={() => handleUnlinkPluggy(item.id)}>
+                          <Unplug className="mr-1 h-3 w-3" />
+                          Desvincular
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhuma conexão registrada.</p>
+              )
             )}
           </CardContent>
         </Card>

@@ -477,6 +477,43 @@ function TransactionForm({
 // MAIN TRANSACTIONS PAGE
 // ============================================
 
+type PeriodKey = "current-month" | "last-month" | "last-3-months" | "year" | "custom" | "all"
+
+const PERIOD_LABELS: Record<PeriodKey, string> = {
+  "current-month": "Este mês",
+  "last-month": "Mês anterior",
+  "last-3-months": "Últimos 3 meses",
+  year: "Este ano",
+  custom: "Personalizado",
+  all: "Todo o histórico",
+}
+
+function toDateParam(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+function rangeForPeriod(key: PeriodKey, now = new Date()): DateRange | undefined {
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  if (key === "all") return undefined
+  if (key === "current-month") {
+    return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) }
+  }
+  if (key === "last-month") {
+    return { from: new Date(y, m - 1, 1), to: new Date(y, m, 0) }
+  }
+  if (key === "last-3-months") {
+    return { from: new Date(y, m - 2, 1), to: new Date(y, m + 1, 0) }
+  }
+  if (key === "year") {
+    return { from: new Date(y, 0, 1), to: new Date(y, 11, 31) }
+  }
+  return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) }
+}
+
 type TransactionRow = {
   id: string
   date: Date
@@ -496,7 +533,8 @@ type TransactionRow = {
 
 export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const [period, setPeriod] = useState<PeriodKey>("current-month")
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => rangeForPeriod("current-month"))
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -512,8 +550,12 @@ export default function TransactionsPage() {
       return
     }
     let cancelled = false
-    const from = dateRange?.from ? dateRange.from.toISOString().slice(0, 10) : undefined
-    const to = dateRange?.to ? dateRange.to.toISOString().slice(0, 10) : undefined
+    const from = dateRange?.from ? toDateParam(dateRange.from) : undefined
+    const to = dateRange?.to
+      ? toDateParam(dateRange.to)
+      : dateRange?.from
+        ? toDateParam(dateRange.from)
+        : undefined
     Promise.all([
       fetchTransactions({ from, to }),
       fetchAccounts(),
@@ -550,8 +592,12 @@ export default function TransactionsPage() {
 
   const refetchTransactions = () => {
     if (!hasApi) return
-    const from = dateRange?.from ? dateRange.from.toISOString().slice(0, 10) : undefined
-    const to = dateRange?.to ? dateRange.to.toISOString().slice(0, 10) : undefined
+    const from = dateRange?.from ? toDateParam(dateRange.from) : undefined
+    const to = dateRange?.to
+      ? toDateParam(dateRange.to)
+      : dateRange?.from
+        ? toDateParam(dateRange.from)
+        : undefined
     fetchTransactions({ from, to }).then((txs) =>
       setApiTransactions(
         txs.map((t) => ({
@@ -635,7 +681,7 @@ export default function TransactionsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transações</h1>
           <p className="text-muted-foreground">
-            Gerencie suas receitas e despesas
+            Extrato do período selecionado
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -681,7 +727,7 @@ export default function TransactionsPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Receitas</p>
+                <p className="text-sm text-muted-foreground">Receitas no período</p>
                 <p className="text-xl font-bold text-emerald-600">
                   {formatCurrency(totalIncome)}
                 </p>
@@ -696,7 +742,7 @@ export default function TransactionsPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Despesas</p>
+                <p className="text-sm text-muted-foreground">Despesas no período</p>
                 <p className="text-xl font-bold text-rose-600">
                   {formatCurrency(totalExpense)}
                 </p>
@@ -711,7 +757,7 @@ export default function TransactionsPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Balanço</p>
+                <p className="text-sm text-muted-foreground">Balanço no período</p>
                 <p
                   className={`text-xl font-bold ${totalIncome - totalExpense >= 0
                     ? "text-emerald-600"
@@ -743,6 +789,27 @@ export default function TransactionsPage() {
               />
             </div>
 
+            <Select
+              value={period}
+              onValueChange={(value) => {
+                const next = value as PeriodKey
+                setPeriod(next)
+                setDateRange(rangeForPeriod(next))
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current-month">{PERIOD_LABELS["current-month"]}</SelectItem>
+                <SelectItem value="last-month">{PERIOD_LABELS["last-month"]}</SelectItem>
+                <SelectItem value="last-3-months">{PERIOD_LABELS["last-3-months"]}</SelectItem>
+                <SelectItem value="year">{PERIOD_LABELS.year}</SelectItem>
+                <SelectItem value="custom">{PERIOD_LABELS.custom}</SelectItem>
+                <SelectItem value="all">{PERIOD_LABELS.all}</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="gap-2">
@@ -755,6 +822,8 @@ export default function TransactionsPage() {
                     ) : (
                       formatDate(dateRange.from)
                     )
+                  ) : period === "all" ? (
+                    PERIOD_LABELS.all
                   ) : (
                     "Período"
                   )}
@@ -766,7 +835,10 @@ export default function TransactionsPage() {
                   mode="range"
                   defaultMonth={dateRange?.from}
                   selected={dateRange}
-                  onSelect={setDateRange}
+                  onSelect={(range) => {
+                    setPeriod("custom")
+                    setDateRange(range)
+                  }}
                   numberOfMonths={2}
                 />
               </PopoverContent>
@@ -836,7 +908,7 @@ export default function TransactionsPage() {
               ) : listTransactions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {hasApi ? "Nenhuma transação cadastrada. Clique em \"Nova Transação\" para registrar a primeira." : "Configure a conexão com o servidor para ver e criar transações."}
+                    {hasApi ? "Nenhuma transação neste período." : "Configure a conexão com o servidor para ver e criar transações."}
                   </TableCell>
                 </TableRow>
               ) : filteredTransactions.length === 0 ? (

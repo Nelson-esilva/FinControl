@@ -133,8 +133,8 @@ export class TransactionsService {
     if (filters?.parentTransactionId) where.parentTransactionId = filters.parentTransactionId;
     if (filters?.from || filters?.to) {
       where.date = {};
-      if (filters.from) (where.date as Record<string, Date>).gte = new Date(filters.from);
-      if (filters.to) (where.date as Record<string, Date>).lte = new Date(filters.to);
+      if (filters.from) (where.date as Record<string, Date>).gte = parseDayBound(filters.from, false);
+      if (filters.to) (where.date as Record<string, Date>).lte = parseDayBound(filters.to, true);
     }
     return this.prisma.transaction.findMany({
       where,
@@ -227,4 +227,15 @@ export class TransactionsService {
       return prismaTx.transaction.delete({ where: { id } });
     });
   }
+}
+
+function parseDayBound(value: string, endOfDay: boolean): Date {
+  const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (dayOnly) {
+    const [year, month, day] = value.split('-').map(Number);
+    return endOfDay
+      ? new Date(year, month - 1, day, 23, 59, 59, 999)
+      : new Date(year, month - 1, day, 0, 0, 0, 0);
+  }
+  return new Date(value);
 }
