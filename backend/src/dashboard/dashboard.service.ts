@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TransactionType } from '@prisma/client';
+import { hideSyntheticLedgerTx } from '../accounts/ledger-balance';
 
 const USER_ID = 'user-id';
 
@@ -25,11 +26,12 @@ export class DashboardService {
           userId: USER_ID,
           date: { gte: startOfMonth, lte: endOfMonth },
           status: 'COMPLETED',
+          ...hideSyntheticLedgerTx,
         },
         include: { category: true },
       }),
       this.prisma.transaction.findMany({
-        where: { userId: USER_ID },
+        where: { userId: USER_ID, status: { not: 'CANCELLED' }, ...hideSyntheticLedgerTx },
         include: { account: true, category: true },
         orderBy: { date: 'desc' },
         take: 10,
@@ -39,6 +41,7 @@ export class DashboardService {
           userId: USER_ID,
           date: { gte: startOfPrevMonth, lte: endOfPrevMonth },
           status: 'COMPLETED',
+          ...hideSyntheticLedgerTx,
         },
       }),
       this.prisma.budget.findMany({
@@ -58,10 +61,9 @@ export class DashboardService {
       }),
     ]);
 
-    const totalBalance = accounts.reduce(
-      (sum, a) => sum + Number(a.currentBalance),
-      0,
-    );
+    const totalBalance = accounts
+      .filter((a) => a.type !== 'CREDIT_CARD')
+      .reduce((sum, a) => sum + Number(a.currentBalance), 0);
     const monthlyIncome = transactions
       .filter((t) => t.type === TransactionType.INCOME)
       .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -88,7 +90,12 @@ export class DashboardService {
     const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const last12MonthsTxs = await this.prisma.transaction.findMany({
-      where: { userId: USER_ID, date: { gte: twelveMonthsAgo }, status: 'COMPLETED' },
+      where: {
+        userId: USER_ID,
+        date: { gte: twelveMonthsAgo },
+        status: 'COMPLETED',
+        ...hideSyntheticLedgerTx,
+      },
     });
     const byMonth = new Map<string, { income: number; expense: number }>();
     for (let i = 11; i >= 0; i--) {

@@ -14,6 +14,11 @@ export class PluggyController {
     return this.pluggy.findAll();
   }
 
+  @Post('sync')
+  syncAll() {
+    return this.pluggy.syncAll();
+  }
+
   @Post('items')
   register(@Body() dto: RegisterPluggyItemDto) {
     return this.pluggy.register(dto);

@@ -41,6 +41,16 @@ export async function apiDelete(path: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(apiUrl(path), {
     method: "POST",

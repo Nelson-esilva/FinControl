@@ -544,7 +544,7 @@ export default function ExpensesPage() {
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Despesas</h1>
                     <p className="text-muted-foreground">
-                        Gerencie suas despesas fixas, parcelamentos e empréstimos
+                        Lista de compromissos (aluguel, luz, parcelas). Não mexe no saldo.
                     </p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

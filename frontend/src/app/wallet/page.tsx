@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate, cn } from "@/lib/utils"
 import {
   Plus,
   Wallet,
@@ -44,9 +44,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { fetchAccounts, createAccount, updateAccount, deleteAccount, hasApi, toNum, fetchPluggyItems, registerPluggyItem, syncPluggyItem, unlinkPluggyItem } from "@/lib/api-data"
+import { fetchAccounts, createAccount, updateAccount, deleteAccount, hasApi, toNum, fetchPluggyItems, registerPluggyItem, syncPluggyItem, syncAllPluggyItems, unlinkPluggyItem } from "@/lib/api-data"
 import { toast } from "sonner"
-import { formatDate } from "@/lib/utils"
 
 const accountTypeConfig: Record<string, { label: string; icon: typeof Wallet }> = {
   CHECKING: { label: "Conta Corrente", icon: Landmark },
@@ -396,6 +395,29 @@ export default function WalletPage() {
     }
   }
 
+  const handleSyncAllPluggy = async () => {
+    if (pluggyItems.length === 0) {
+      toast.error("Nenhuma conexão Meu Pluggy. Cole o Item ID no bloco abaixo.")
+      return
+    }
+    setPluggyBusy(true)
+    try {
+      const result = await syncAllPluggyItems(pluggyItems.map((item) => item.id))
+      const extra = result.errors?.length ? ` (${result.errors.length} com aviso)` : ""
+      toast.success(
+        `Contas atualizadas: ${result.accountCount} contas, ${result.transactionCount} lançamentos.${extra}`,
+      )
+      if (result.errors?.length) {
+        toast.error(result.errors.join(" "))
+      }
+      refetch()
+    } catch (err) {
+      toast.error(nestErrorMessage(err, "Falha ao sincronizar as contas."))
+    } finally {
+      setPluggyBusy(false)
+    }
+  }
+
   const handleUnlinkPluggy = async (id: string) => {
     if (!window.confirm("Desvincular esta conexão? As contas importadas ficam inativas; o consentimento no Meu Pluggy permanece.")) return
     setPluggyBusy(true)
@@ -433,13 +455,26 @@ export default function WalletPage() {
             Gerencie suas contas e cartões
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Conta
+        <div className="flex flex-wrap items-center gap-2">
+          {hasApi && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pluggyBusy || pluggyItems.length === 0}
+              onClick={handleSyncAllPluggy}
+              title={pluggyItems.length === 0 ? "Cole o Item ID do Meu Pluggy primeiro" : "Atualiza saldos e extrato no banco"}
+            >
+              <RefreshCw className={cn("mr-2 h-4 w-4", pluggyBusy && "animate-spin")} />
+              {pluggyBusy ? "Sincronizando…" : "Sincronizar contas"}
             </Button>
-          </DialogTrigger>
+          )}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Conta
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nova Conta</DialogTitle>
@@ -461,6 +496,7 @@ export default function WalletPage() {
             )}
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {hasApi && (

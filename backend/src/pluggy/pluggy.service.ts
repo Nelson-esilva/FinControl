@@ -51,6 +51,46 @@ export class PluggyService {
     return { ...updated, ...summary };
   }
 
+  async syncAll() {
+    this.client.assertConfigured();
+    const items = await this.prisma.pluggyItem.findMany({
+      where: { userId: USER_ID },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (items.length === 0) {
+      throw new BadRequestException('Nenhuma conexão Meu Pluggy para sincronizar. Cole o Item ID primeiro.');
+    }
+
+    let accountCount = 0;
+    let transactionCount = 0;
+    const errors: string[] = [];
+
+    for (const item of items) {
+      try {
+        const remote = await this.fetchRemoteItem(item.pluggyItemId);
+        await this.upsertItem(remote, item.id);
+        const summary = await this.syncItem(item.id);
+        accountCount += summary.accountCount;
+        transactionCount += summary.transactionCount;
+      } catch (err) {
+        const name = item.connectorName ?? item.pluggyItemId;
+        const message = err instanceof Error ? err.message : 'falha ao sincronizar';
+        errors.push(`${name}: ${message}`);
+      }
+    }
+
+    if (errors.length === items.length) {
+      throw new BadRequestException(errors.join(' '));
+    }
+
+    return {
+      itemCount: items.length,
+      accountCount,
+      transactionCount,
+      errors,
+    };
+  }
+
   async unlink(id: string) {
     const existing = await this.prisma.pluggyItem.findFirst({
       where: { id, userId: USER_ID },
@@ -235,7 +275,7 @@ export class PluggyService {
 
   private async upsertImportedTransaction(
     payload: PluggyTransactionPayload,
-    categories: { incomeId: string; expenseId: string },
+    categories: { incomeId: string; expenseId: string; byType: Map<string, { id: string; name: string }[]> },
     knownAccountId?: string,
   ) {
     if (!payload.id) return;
@@ -245,7 +285,8 @@ export class PluggyService {
     const amount = toDecimal(Math.abs(Number(payload.amount ?? 0)));
     const date = payload.date ? new Date(payload.date) : new Date();
     const description = (payload.description || 'Lançamento importado').slice(0, 500);
-    const categoryId = type === TransactionType.INCOME ? categories.incomeId : categories.expenseId;
+    const fallbackId = type === TransactionType.INCOME ? categories.incomeId : categories.expenseId;
+    const matchedId = matchCategory(payload.category, categories.byType.get(type) ?? [], fallbackId);
 
     let accountId = knownAccountId;
     if (!accountId && payload.accountId) {
@@ -257,13 +298,20 @@ export class PluggyService {
     }
     if (!accountId) return;
 
+    const existing = await this.prisma.transaction.findUnique({
+      where: { pluggyTransactionId: payload.id },
+      select: { categoryId: true },
+    });
+    const keepUserCategory =
+      existing && existing.categoryId !== categories.incomeId && existing.categoryId !== categories.expenseId;
+
     const data = {
       amount,
       date,
       description,
       type,
       status,
-      categoryId,
+      categoryId: keepUserCategory ? existing.categoryId : matchedId,
       accountId,
       source: DataSource.PLUGGY,
       metadata: payload.category ? { pluggyCategory: payload.category } : undefined,
@@ -281,17 +329,18 @@ export class PluggyService {
   }
 
   private async deleteImported(pluggyTransactionIds: string[]) {
-    await this.prisma.transaction.deleteMany({
+    await this.prisma.transaction.updateMany({
       where: {
         userId: USER_ID,
         source: DataSource.PLUGGY,
         pluggyTransactionId: { in: pluggyTransactionIds },
       },
+      data: { status: TransactionStatus.CANCELLED },
     });
   }
 
   private async ensureImportCategories() {
-    const [income, expense] = await Promise.all([
+    const [income, expense, all] = await Promise.all([
       this.prisma.category.upsert({
         where: { userId_name_type: { userId: USER_ID, name: IMPORT_CATEGORY, type: TransactionType.INCOME } },
         create: {
@@ -316,8 +365,18 @@ export class PluggyService {
         },
         update: {},
       }),
+      this.prisma.category.findMany({
+        where: { userId: USER_ID },
+        select: { id: true, name: true, type: true },
+      }),
     ]);
-    return { incomeId: income.id, expenseId: expense.id };
+    const byType = new Map<string, { id: string; name: string }[]>();
+    for (const cat of all) {
+      const list = byType.get(cat.type) ?? [];
+      list.push({ id: cat.id, name: cat.name });
+      byType.set(cat.type, list);
+    }
+    return { incomeId: income.id, expenseId: expense.id, byType };
   }
 }
 
@@ -354,4 +413,29 @@ function dueDayFrom(iso?: string): number | undefined {
 function toDecimal(value: number | undefined | null): Decimal {
   const n = Number(value ?? 0);
   return new Decimal((Number.isFinite(n) ? n : 0).toFixed(2));
+}
+
+function normalizeLabel(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+function matchCategory(
+  pluggyName: string | undefined,
+  cats: { id: string; name: string }[],
+  fallbackId: string,
+) {
+  if (!pluggyName) return fallbackId;
+  const needle = normalizeLabel(pluggyName);
+  if (!needle || needle === normalizeLabel(IMPORT_CATEGORY)) return fallbackId;
+  const exact = cats.find((c) => normalizeLabel(c.name) === needle);
+  if (exact) return exact.id;
+  const partial = cats.find((c) => {
+    const n = normalizeLabel(c.name);
+    return n.length > 2 && (needle.includes(n) || n.includes(needle));
+  });
+  return partial?.id ?? fallbackId;
 }

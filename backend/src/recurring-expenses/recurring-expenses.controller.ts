@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/
 import { RecurringExpensesService } from './recurring-expenses.service';
 import { CreateRecurringExpenseDto } from './dto/create-recurring-expense.dto';
 import { UpdateRecurringExpenseDto } from './dto/update-recurring-expense.dto';
+import { LinkBillDto, UndoBillLinkDto } from './dto/link-bill.dto';
 
 @Controller('recurring-expenses')
 export class RecurringExpensesController {
@@ -27,21 +28,19 @@ export class RecurringExpensesController {
         return this.service.getBills(month);
     }
 
+    @Get(':id/candidates')
+    findCandidates(@Param('id') id: string, @Query('month') month: string) {
+        return this.service.findCandidates(id, month);
+    }
+
     @Post(':id/pay')
-    payBill(
-        @Param('id') id: string,
-        @Body('month') month: string,
-        @Body('accountId') accountId?: string
-    ) {
-        return this.service.payBill(id, month, accountId);
+    payBill(@Param('id') id: string, @Body() dto: LinkBillDto) {
+        return this.service.payBill(id, dto.month, dto.transactionId);
     }
 
     @Post(':id/undo-pay')
-    undoPayBill(
-        @Param('id') id: string,
-        @Body('month') month: string
-    ) {
-        return this.service.undoPayBill(id, month);
+    undoPayBill(@Param('id') id: string, @Body() dto: UndoBillLinkDto) {
+        return this.service.undoPayBill(id, dto.month);
     }
 
     @Get(':id')
@@ -59,3 +58,4 @@ export class RecurringExpensesController {
         return this.service.remove(id);
     }
 }
+

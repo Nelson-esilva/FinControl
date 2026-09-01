@@ -35,9 +35,10 @@ import {
     Undo2
 } from "lucide-react"
 
-import { fetchBills, payBill, undoPayBill, type ApiBill } from "@/lib/api-recurring"
-import { fetchAccounts, type ApiAccount, hasApi } from "@/lib/api-data"
-import { formatCurrency } from "@/lib/utils"
+import { fetchBills, fetchBillCandidates, payBill, undoPayBill, type ApiBill, type ApiBillCandidate } from "@/lib/api-recurring"
+import { hasApi, toNum } from "@/lib/api-data"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import { toast } from "sonner"
 
 const typeIcons: Record<string, typeof Repeat> = {
     FIXED: Home,
@@ -66,11 +67,12 @@ function getMonthName(date: Date) {
 export default function PayablePage() {
     const [currentDate, setCurrentDate] = useState(new Date())
     const [bills, setBills] = useState<ApiBill[]>([])
-    const [accounts, setAccounts] = useState<ApiAccount[]>([])
     const [loading, setLoading] = useState(true)
 
     const [payingBill, setPayingBill] = useState<ApiBill | null>(null)
-    const [selectedAccount, setSelectedAccount] = useState<string>("")
+    const [candidates, setCandidates] = useState<ApiBillCandidate[]>([])
+    const [selectedTx, setSelectedTx] = useState<string>("")
+    const [loadingCandidates, setLoadingCandidates] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
 
     const monthStr = toYearMonth(currentDate)
@@ -82,15 +84,8 @@ export default function PayablePage() {
             return
         }
         try {
-            const [fetchedBills, fetchedAccounts] = await Promise.all([
-                fetchBills(monthStr),
-                fetchAccounts()
-            ])
+            const fetchedBills = await fetchBills(monthStr)
             setBills(fetchedBills)
-            setAccounts(fetchedAccounts)
-            if (fetchedAccounts.length > 0) {
-                setSelectedAccount(fetchedAccounts[0].id)
-            }
         } catch (err) {
             console.error(err)
         }
@@ -101,32 +96,56 @@ export default function PayablePage() {
         loadData()
     }, [monthStr])
 
+    useEffect(() => {
+        if (!payingBill) {
+            setCandidates([])
+            setSelectedTx("")
+            return
+        }
+        let cancelled = false
+        setLoadingCandidates(true)
+        fetchBillCandidates(payingBill.recurringExpenseId, monthStr).then((list) => {
+            if (cancelled) return
+            setCandidates(list)
+            setSelectedTx(list[0]?.id ?? "")
+            setLoadingCandidates(false)
+        }).catch(() => {
+            if (cancelled) return
+            setCandidates([])
+            setSelectedTx("")
+            setLoadingCandidates(false)
+        })
+        return () => { cancelled = true }
+    }, [payingBill?.id, monthStr])
+
     const handlePrevMonth = () => setCurrentDate(prev => addMonths(prev, -1))
     const handleNextMonth = () => setCurrentDate(prev => addMonths(prev, 1))
     const handleToday = () => setCurrentDate(new Date())
 
     const handlePayConfirm = async () => {
-        if (!payingBill || !selectedAccount) return
+        if (!payingBill || !selectedTx) return
         setIsProcessing(true)
-        const success = await payBill(payingBill.recurringExpenseId, monthStr, selectedAccount)
+        const success = await payBill(payingBill.recurringExpenseId, monthStr, selectedTx)
         setIsProcessing(false)
         if (success) {
             setPayingBill(null)
+            toast.success("Compromisso vinculado ao extrato.")
             loadData()
         } else {
-            alert("Erro ao tentar pagar a conta.")
+            toast.error("Não foi possível vincular. Escolha outra linha do extrato.")
         }
     }
 
     const handleUndoPay = async (billId: string, recurringId: string) => {
-        if (!confirm("Tem certeza que deseja desfazer o pagamento desta conta? O saldo voltará para sua conta.")) return
+        if (!confirm("Desvincular este compromisso do extrato? O lançamento do banco permanece.")) return
         setIsProcessing(true)
         const success = await undoPayBill(recurringId, monthStr)
         setIsProcessing(false)
         if (success) {
+            toast.success("Vínculo removido.")
             loadData()
         } else {
-            alert("Erro ao tentar desfazer pagamento.")
+            toast.error("Não foi possível desvincular.")
         }
     }
 
@@ -147,7 +166,7 @@ export default function PayablePage() {
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Contas a Pagar</h1>
                     <p className="text-muted-foreground">
-                        Visão de dívidas, faturas e contas fixas para o mês.
+                        Compromissos do mês. “Pago” significa que a linha já apareceu no extrato.
                     </p>
                 </div>
 
@@ -203,7 +222,7 @@ export default function PayablePage() {
             <Card className="overflow-hidden">
                 <div className="bg-muted p-4 space-y-2">
                     <div className="flex justify-between text-sm font-medium">
-                        <span className="text-emerald-600">Progresso de Pagamentos</span>
+                        <span className="text-emerald-600">Progresso no extrato</span>
                         <span>{Math.round(progress)}% Concluído</span>
                     </div>
                     <Progress value={progress} className="h-3 bg-emerald-100 [&>div]:bg-emerald-500 dark:bg-emerald-950/50" />
@@ -228,7 +247,7 @@ export default function PayablePage() {
                         </h3>
                         {pendingBills.length === 0 && (
                             <div className="p-8 border rounded-xl border-dashed text-center text-muted-foreground text-sm">
-                                Todas as contas deste mês foram pagas! 🎉
+                                Todas as contas deste mês já estão no extrato.
                             </div>
                         )}
                         <div className="grid gap-3">
@@ -278,12 +297,12 @@ export default function PayablePage() {
                                             <Dialog open={payingBill?.id === bill.id} onOpenChange={(open) => !open && setPayingBill(null)}>
                                                 <DialogTrigger asChild>
                                                     <Button size="sm" onClick={() => setPayingBill(bill)} className="gap-2">
-                                                        Pagar <ArrowRight className="h-3.5 w-3.5" />
+                                                        Vincular ao extrato <ArrowRight className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="sm:max-w-md">
                                                     <DialogHeader>
-                                                        <DialogTitle>Confirmar Pagamento</DialogTitle>
+                                                        <DialogTitle>Vincular ao extrato</DialogTitle>
                                                     </DialogHeader>
                                                     <div className="space-y-4 py-4">
                                                         <div className="p-4 rounded-lg bg-muted flex items-center justify-between">
@@ -294,22 +313,30 @@ export default function PayablePage() {
                                                             <div className="text-xl font-bold">{formatCurrency(Number(bill.amount))}</div>
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Conta de Saída</label>
-                                                            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Selecione a conta..." />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {accounts.map(acc => (
-                                                                        <SelectItem key={acc.id} value={acc.id}>
-                                                                            {acc.name} - Saldo: {formatCurrency(Number(acc.currentBalance))}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                            <label className="text-sm font-medium">Linha do extrato</label>
+                                                            {loadingCandidates ? (
+                                                                <p className="text-sm text-muted-foreground">Buscando no extrato…</p>
+                                                            ) : candidates.length === 0 ? (
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    Nenhum lançamento com valor parecido neste mês. Sincronize a conta ou espere o débito aparecer no banco.
+                                                                </p>
+                                                            ) : (
+                                                                <Select value={selectedTx} onValueChange={setSelectedTx}>
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Selecione o lançamento…" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {candidates.map((row) => (
+                                                                            <SelectItem key={row.id} value={row.id}>
+                                                                                {formatDate(row.date)} · {row.description} · {formatCurrency(toNum(row.amount))} ({row.accountName})
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            )}
                                                         </div>
-                                                        <Button className="w-full" disabled={isProcessing || !selectedAccount} onClick={handlePayConfirm}>
-                                                            {isProcessing ? "Confirmando..." : "Confirmar Pagamento Seguro"}
+                                                        <Button className="w-full" disabled={isProcessing || !selectedTx} onClick={handlePayConfirm}>
+                                                            {isProcessing ? "Vinculando…" : "Confirmar vínculo"}
                                                         </Button>
                                                     </div>
                                                 </DialogContent>
@@ -327,7 +354,7 @@ export default function PayablePage() {
                         </h3>
                         {paidBills.length === 0 && (
                             <div className="p-8 border rounded-xl border-dashed text-center text-muted-foreground text-sm">
-                                Nenhum pagamento efetuado ainda.
+                                Nenhum compromisso vinculado ainda.
                             </div>
                         )}
                         <div className="grid gap-3">
@@ -347,7 +374,7 @@ export default function PayablePage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-0 flex gap-1 items-center shadow-none">
-                                                Pago
+                                                No extrato
                                             </Badge>
                                             <Button
                                                 variant="ghost"
@@ -355,7 +382,7 @@ export default function PayablePage() {
                                                 className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                                                 onClick={() => handleUndoPay(bill.id, bill.recurringExpenseId)}
                                                 disabled={isProcessing}
-                                                title="Desfazer pagamento"
+                                                title="Desvincular do extrato"
                                             >
                                                 <Undo2 className="h-4 w-4" />
                                             </Button>

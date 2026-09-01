@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { hideSyntheticLedgerTx } from '../accounts/ledger-balance';
 
 const USER_ID = 'user-id';
 
@@ -40,7 +41,9 @@ export class BudgetsService {
             userId: USER_ID,
             categoryId: b.categoryId,
             type: 'EXPENSE',
+            status: 'COMPLETED',
             date: { gte: b.startDate, lte: b.endDate },
+            ...hideSyntheticLedgerTx,
           },
           _sum: { amount: true },
         });

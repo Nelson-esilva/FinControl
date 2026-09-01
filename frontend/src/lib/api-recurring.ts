@@ -156,10 +156,28 @@ export async function fetchBills(month: string): Promise<ApiBill[]> {
     }
 }
 
-export async function payBill(id: string, month: string, accountId?: string): Promise<boolean> {
+export interface ApiBillCandidate {
+    id: string
+    date: string
+    description: string
+    amount: number | { toNumber?: () => number }
+    accountName: string
+}
+
+export async function fetchBillCandidates(id: string, month: string): Promise<ApiBillCandidate[]> {
+    if (!hasApi) return []
+    try {
+        const list = await apiGet<ApiBillCandidate[]>(`/recurring-expenses/${id}/candidates?month=${encodeURIComponent(month)}`)
+        return Array.isArray(list) ? list : []
+    } catch {
+        return []
+    }
+}
+
+export async function payBill(id: string, month: string, transactionId: string): Promise<boolean> {
     if (!hasApi) return false
     try {
-        await apiPost(`/recurring-expenses/${id}/pay`, { month, accountId })
+        await apiPost(`/recurring-expenses/${id}/pay`, { month, transactionId })
         return true
     } catch {
         return false

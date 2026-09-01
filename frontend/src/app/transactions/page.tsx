@@ -523,6 +523,7 @@ type TransactionRow = {
   amount: number
   type: string
   status: string
+  source?: string
   hasAttachment?: boolean
   installmentNumber: number | null
   totalInstallments: number | null
@@ -581,6 +582,7 @@ export default function TransactionsPage() {
           categoryId: t.categoryId ?? (t.category as { id?: string })?.id,
           accountId: t.accountId ?? (t.account as { id?: string })?.id,
           metadata: t.metadata,
+          source: t.source,
         }))
       )
       setApiAccounts(accs.map((a) => ({ id: a.id, name: a.name, type: (a as { type?: string }).type })))
@@ -618,6 +620,7 @@ export default function TransactionsPage() {
           categoryId: t.categoryId ?? (t.category as { id?: string })?.id,
           accountId: t.accountId ?? (t.account as { id?: string })?.id,
           metadata: t.metadata,
+          source: t.source,
         }))
       )
     )
@@ -668,7 +671,7 @@ export default function TransactionsPage() {
 
   const handlePay = async (row: TransactionRow) => {
     if (!hasApi) return
-    if (!window.confirm("Confirmar o pagamento desta operação? O saldo da conta será atualizado.")) return
+    if (!window.confirm("Marcar esta parcela como paga? Só contas manuais alteram o saldo.")) return
     const updated = await apiPayTransaction(row.id)
     if (updated) refetchTransactions()
     else alert("Erro ao tentar baixar a parcela, verifique se já não encontra-se paga.")
@@ -681,7 +684,7 @@ export default function TransactionsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transações</h1>
           <p className="text-muted-foreground">
-            Extrato do período selecionado
+            Extrato das contas no período selecionado
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -986,7 +989,7 @@ export default function TransactionsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {transaction.status !== "COMPLETED" && (
+                            {transaction.status !== "COMPLETED" && transaction.source !== "PLUGGY" && (
                               <DropdownMenuItem className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 cursor-pointer" onClick={() => handlePay(transaction)}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" />
                                 Marcar Pago

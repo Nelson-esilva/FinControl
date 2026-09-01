@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRecurringExpenseDto } from './dto/create-recurring-expense.dto';
 import { UpdateRecurringExpenseDto } from './dto/update-recurring-expense.dto';
@@ -11,51 +12,28 @@ export class RecurringExpensesService {
     constructor(private readonly prisma: PrismaService) { }
 
     create(dto: CreateRecurringExpenseDto) {
-        return this.prisma.$transaction(async (tx: any) => {
-            const recurring = await tx.recurringExpense.create({
-                data: {
-                    userId: USER_ID,
-                    name: dto.name,
-                    description: dto.description,
-                    type: dto.type as any,
-                    amount: new Decimal(dto.amount),
-                    frequency: (dto.frequency as any) ?? 'MONTHLY',
-                    dueDay: dto.dueDay,
-                    startDate: new Date(dto.startDate),
-                    endDate: dto.endDate ? new Date(dto.endDate) : null,
-                    currentInstallment: dto.currentInstallment,
-                    totalInstallments: dto.totalInstallments,
-                    interestRate: dto.interestRate != null ? new Decimal(dto.interestRate) : null,
-                    cardName: dto.cardName,
-                    color: dto.color ?? '#6366f1',
-                    icon: dto.icon ?? 'Repeat',
-                    categoryId: dto.categoryId || null,
-                    accountId: dto.accountId || null,
-                    nextDueDate: this.calculateNextDueDate(dto.startDate, dto.dueDay),
-                },
-                include: { category: true, account: true },
-            });
-
-            if (dto.accountId && dto.categoryId) {
-                await tx.transaction.create({
-                    data: {
-                        userId: USER_ID,
-                        accountId: dto.accountId,
-                        categoryId: dto.categoryId,
-                        amount: new Decimal(dto.amount),
-                        date: new Date(dto.startDate),
-                        description: `Despesa Recorrente: ${dto.name}`,
-                        type: 'EXPENSE',
-                        status: 'COMPLETED',
-                        isRecurring: true,
-                    },
-                });
-                await tx.account.update({
-                    where: { id: dto.accountId },
-                    data: { currentBalance: { decrement: new Decimal(dto.amount) } },
-                });
-            }
-            return recurring;
+        return this.prisma.recurringExpense.create({
+            data: {
+                userId: USER_ID,
+                name: dto.name,
+                description: dto.description,
+                type: dto.type as any,
+                amount: new Decimal(dto.amount),
+                frequency: (dto.frequency as any) ?? 'MONTHLY',
+                dueDay: dto.dueDay,
+                startDate: new Date(dto.startDate),
+                endDate: dto.endDate ? new Date(dto.endDate) : null,
+                currentInstallment: dto.currentInstallment,
+                totalInstallments: dto.totalInstallments,
+                interestRate: dto.interestRate != null ? new Decimal(dto.interestRate) : null,
+                cardName: dto.cardName,
+                color: dto.color ?? '#6366f1',
+                icon: dto.icon ?? 'Repeat',
+                categoryId: dto.categoryId || null,
+                accountId: dto.accountId || null,
+                nextDueDate: this.calculateNextDueDate(dto.startDate, dto.dueDay),
+            },
+            include: { category: true, account: true },
         });
     }
 
@@ -188,6 +166,7 @@ export class RecurringExpensesService {
             where: {
                 userId: USER_ID,
                 recurringExpenseId: { not: null },
+                status: { not: 'CANCELLED' },
                 date: {
                     gte: startOfMonth,
                     lte: endOfMonth
@@ -225,114 +204,156 @@ export class RecurringExpensesService {
         });
     }
 
-    /** Marca uma despesa como paga neste mês, gerando a transação */
-    async payBill(id: string, month: string, accountId?: string) {
-        return this.prisma.$transaction(async (tx: any) => {
-            const expense = await tx.recurringExpense.findFirstOrThrow({
-                where: { id, userId: USER_ID }
-            });
+    /** Candidatos do extrato para vincular a este compromisso no mês. */
+    async findCandidates(id: string, month: string) {
+        const expense = await this.prisma.recurringExpense.findFirst({
+            where: { id, userId: USER_ID },
+        });
+        if (!expense) throw new NotFoundException('Compromisso não encontrado.');
+        if (!month) throw new BadRequestException('Informe o mês (YYYY-MM).');
 
-            const [yearStr, monthStr] = month.split('-');
-            const year = parseInt(yearStr);
-            const m = parseInt(monthStr) - 1;
+        const { startOfMonth, endOfMonth } = monthBounds(month);
+        const amount = Number(expense.amount);
+        const dueDay = expense.dueDay || startOfMonth.getUTCDate();
+        const dueDate = new Date(Date.UTC(startOfMonth.getUTCFullYear(), startOfMonth.getUTCMonth(), dueDay, 12, 0, 0));
+        const windowStart = new Date(startOfMonth);
+        windowStart.setUTCDate(windowStart.getUTCDate() - 5);
+        const windowEnd = new Date(endOfMonth);
+        windowEnd.setUTCDate(windowEnd.getUTCDate() + 5);
 
-            const startOfMonth = new Date(year, m, 1);
-            const endOfMonth = new Date(year, m + 1, 0, 23, 59, 59, 999);
+        const txs = await this.prisma.transaction.findMany({
+            where: {
+                userId: USER_ID,
+                source: DataSource.PLUGGY,
+                status: { not: 'CANCELLED' },
+                type: { in: ['EXPENSE', 'PAYMENT'] },
+                date: { gte: windowStart, lte: windowEnd },
+                OR: [
+                    { recurringExpenseId: null },
+                    { recurringExpenseId: id },
+                ],
+            },
+            include: { account: true },
+        });
 
-            // Verifica se já não pagou
-            const existingTx = await tx.transaction.findFirst({
-                where: {
-                    userId: USER_ID,
-                    recurringExpenseId: id,
-                    date: { gte: startOfMonth, lte: endOfMonth }
-                }
-            });
+        const tokens = tokenize(expense.name);
+        const tolerance = Math.max(1, amount * 0.02);
 
-            if (existingTx) {
-                throw new Error("Conta já paga para este mês.");
-            }
+        return txs
+            .map((row) => {
+                const txAmount = Number(row.amount);
+                const amountDiff = Math.abs(txAmount - amount);
+                if (amountDiff > tolerance) return null;
+                const daysFromDue = Math.abs((row.date.getTime() - dueDate.getTime()) / 86_400_000);
+                const desc = row.description.toLowerCase();
+                const nameHit = tokens.some((t) => desc.includes(t));
+                const score = (amountDiff === 0 ? 50 : 40 - Math.min(30, amountDiff)) + (nameHit ? 30 : 0) + Math.max(0, 20 - daysFromDue);
+                return {
+                    id: row.id,
+                    date: row.date,
+                    description: row.description,
+                    amount: txAmount,
+                    accountName: row.account.name,
+                    score,
+                };
+            })
+            .filter((row): row is NonNullable<typeof row> => row != null)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 12)
+            .map(({ score: _score, ...rest }) => rest);
+    }
 
-            let dueDay = expense.dueDay || startOfMonth.getDate();
-            if (dueDay > endOfMonth.getDate()) dueDay = endOfMonth.getDate();
-            const txDate = new Date(year, m, dueDay);
+    /** Liga o compromisso a uma linha já existente no extrato. */
+    async payBill(id: string, month: string, transactionId?: string) {
+        if (!transactionId) {
+            throw new BadRequestException('Selecione uma linha do extrato para vincular.');
+        }
 
-            const chosenAccountId = accountId || expense.accountId;
-            if (!chosenAccountId) {
-                throw new Error("AccountId é obrigatório para pagamento.");
-            }
+        const expense = await this.prisma.recurringExpense.findFirst({
+            where: { id, userId: USER_ID },
+        });
+        if (!expense) throw new NotFoundException('Compromisso não encontrado.');
 
-            let catId = expense.categoryId;
-            if (!catId) {
-                const fallbackCat = await tx.category.findFirst({
-                    where: { userId: USER_ID, type: "EXPENSE" }
-                });
-                if (!fallbackCat) {
-                    throw new Error("Nenhuma categoria vinculada ou encontrada. Crie uma categoria antes de pagar.");
-                }
-                catId = fallbackCat.id;
-            }
+        const { startOfMonth, endOfMonth } = monthBounds(month);
 
-            const trans = await tx.transaction.create({
-                data: {
-                    userId: USER_ID,
-                    accountId: chosenAccountId,
-                    categoryId: catId,
-                    amount: expense.amount,
-                    date: txDate,
-                    description: `Pagamento: ${expense.name}`,
-                    type: "EXPENSE",
-                    status: "COMPLETED",
-                    isRecurring: true,
-                    recurringExpenseId: expense.id
-                }
-            });
+        const already = await this.prisma.transaction.findFirst({
+            where: {
+                userId: USER_ID,
+                recurringExpenseId: id,
+                status: { not: 'CANCELLED' },
+                date: { gte: startOfMonth, lte: endOfMonth },
+            },
+        });
+        if (already) {
+            throw new BadRequestException('Este compromisso já está vinculado a um lançamento neste mês.');
+        }
 
-            // Atualiza saldo
-            await tx.account.update({
-                where: { id: chosenAccountId },
-                data: { currentBalance: { decrement: expense.amount } }
-            });
+        const extract = await this.prisma.transaction.findFirst({
+            where: { id: transactionId, userId: USER_ID },
+        });
+        if (!extract) throw new NotFoundException('Lançamento não encontrado.');
+        if (extract.source !== DataSource.PLUGGY) {
+            throw new BadRequestException('Só é possível vincular uma linha do extrato do banco.');
+        }
+        if (extract.status === 'CANCELLED') {
+            throw new BadRequestException('Este lançamento foi anulado.');
+        }
+        if (extract.recurringExpenseId && extract.recurringExpenseId !== id) {
+            throw new BadRequestException('Este lançamento já está ligado a outro compromisso.');
+        }
 
-            return trans;
+        return this.prisma.transaction.update({
+            where: { id: extract.id },
+            data: {
+                recurringExpenseId: expense.id,
+                ...(expense.categoryId ? { categoryId: expense.categoryId } : {}),
+            },
         });
     }
 
-    /** Desfaz o pagamento de uma despesa recorrente neste mês, removendo a transação gerada */
+    /** Solta o vínculo com o extrato. Não apaga o lançamento nem altera saldo. */
     async undoPayBill(id: string, month: string) {
-        return this.prisma.$transaction(async (tx: any) => {
-            const [yearStr, monthStr] = month.split('-');
-            const year = parseInt(yearStr);
-            const m = parseInt(monthStr) - 1;
+        const { startOfMonth, endOfMonth } = monthBounds(month);
 
-            const startOfMonth = new Date(year, m, 1);
-            const endOfMonth = new Date(year, m + 1, 0, 23, 59, 59, 999);
-
-            const existingTx = await tx.transaction.findFirst({
-                where: {
-                    userId: USER_ID,
-                    recurringExpenseId: id,
-                    date: { gte: startOfMonth, lte: endOfMonth }
-                }
-            });
-
-            if (!existingTx) {
-                throw new Error("Nenhum pagamento encontrado para este mês.");
-            }
-
-            // Exclui a transação correspondente
-            await tx.transaction.delete({
-                where: { id: existingTx.id }
-            });
-
-            // Reembolsa o saldo
-            if (existingTx.accountId) {
-                await tx.account.update({
-                    where: { id: existingTx.accountId },
-                    data: { currentBalance: { increment: existingTx.amount } }
-                });
-            }
-
-            return { success: true };
+        const existingTx = await this.prisma.transaction.findFirst({
+            where: {
+                userId: USER_ID,
+                recurringExpenseId: id,
+                status: { not: 'CANCELLED' },
+                date: { gte: startOfMonth, lte: endOfMonth },
+            },
         });
+
+        if (!existingTx) {
+            throw new BadRequestException('Nenhum vínculo encontrado para este mês.');
+        }
+
+        await this.prisma.transaction.update({
+            where: { id: existingTx.id },
+            data: { recurringExpenseId: null },
+        });
+
+        return { success: true };
     }
+}
+
+function monthBounds(month: string) {
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr, 10);
+    const m = parseInt(monthStr, 10) - 1;
+    if (!Number.isFinite(year) || !Number.isFinite(m) || m < 0 || m > 11) {
+        throw new BadRequestException('Mês inválido. Use YYYY-MM.');
+    }
+    const startOfMonth = new Date(Date.UTC(year, m, 1, 0, 0, 0));
+    const endOfMonth = new Date(Date.UTC(year, m + 1, 0, 23, 59, 59, 999));
+    return { startOfMonth, endOfMonth, year, m };
+}
+
+function tokenize(name: string): string[] {
+    return name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length > 2);
 }

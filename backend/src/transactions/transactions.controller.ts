@@ -22,8 +22,9 @@ export class TransactionsController {
     @Query('categoryId') categoryId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('source') source?: string,
   ) {
-    return this.transactions.findAll({ type, status, parentTransactionId, accountId, categoryId, from, to });
+    return this.transactions.findAll({ type, status, parentTransactionId, accountId, categoryId, from, to, source });
   }
 
   @Get(':id')

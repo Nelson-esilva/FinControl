@@ -3,7 +3,7 @@
  * Usado quando NEXT_PUBLIC_API_URL está definido.
  */
 
-import { apiGet, apiPost, apiPut, apiDelete, apiUpload, hasApi } from "./api"
+import { apiGet, apiPost, apiPut, apiDelete, apiPatch, apiUpload, hasApi } from "./api"
 
 /** ID do usuário atual (até implementar autenticação real). */
 export const DEFAULT_USER_ID = "user-id"
@@ -69,6 +69,7 @@ export interface ApiTransaction {
   description: string
   type: string
   status: string
+  source?: string
   accountId: string
   categoryId: string
   account?: { name: string; id: string; type?: string }
@@ -117,6 +118,7 @@ export async function fetchTransactions(params?: {
   categoryId?: string
   from?: string
   to?: string
+  source?: string
 }): Promise<ApiTransaction[]> {
   if (!hasApi) return []
   try {
@@ -128,6 +130,7 @@ export async function fetchTransactions(params?: {
     if (params?.categoryId) q.set("categoryId", params.categoryId)
     if (params?.from) q.set("from", params.from)
     if (params?.to) q.set("to", params.to)
+    if (params?.source) q.set("source", params.source)
     const path = q.toString() ? `/transactions?${q}` : "/transactions"
     const list = await apiGet<ApiTransaction[]>(path)
     return Array.isArray(list) ? list : []
@@ -215,12 +218,9 @@ export async function updateTransaction(
 export async function payTransaction(id: string): Promise<ApiTransaction | null> {
   if (!hasApi) return null
   try {
-    const updated = await apiDelete(`/transactions/${id}`); // Actually should use the import for apiPatch or we can use custom.
-    // wait, api.ts might have apiPatch. We can check api.ts or just add apiPatch to it. Or I used `Patch` in the backend. I can use `apiPut` instead if `apiPatch` is not available, but I need to check `api.ts`. Or I can just change the backend to use `Put(":id/pay")`?
-    // Let me hold on this implementation until I check api.ts.
-    return updated as any;
+    return await apiPatch<ApiTransaction>(`/transactions/${id}/pay`)
   } catch {
-    return null;
+    return null
   }
 }
 
@@ -438,6 +438,31 @@ export async function registerPluggyItem(itemId: string): Promise<ApiPluggyItem>
 
 export async function syncPluggyItem(id: string): Promise<ApiPluggyItem> {
   return apiPost<ApiPluggyItem>(`/pluggy/items/${id}/sync`, {})
+}
+
+/** Usa POST /pluggy/items/:id/sync em cada conexão — já existe no backend em execução. */
+export async function syncAllPluggyItems(ids: string[]): Promise<{
+  itemCount: number
+  accountCount: number
+  transactionCount: number
+  errors: string[]
+}> {
+  let accountCount = 0
+  let transactionCount = 0
+  const errors: string[] = []
+  for (const id of ids) {
+    try {
+      const result = await syncPluggyItem(id)
+      accountCount += result.accountCount ?? 0
+      transactionCount += result.transactionCount ?? 0
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : id)
+    }
+  }
+  if (ids.length > 0 && errors.length === ids.length) {
+    throw new Error(errors[0] || "Falha ao sincronizar as contas.")
+  }
+  return { itemCount: ids.length, accountCount, transactionCount, errors }
 }
 
 export async function unlinkPluggyItem(id: string): Promise<void> {
