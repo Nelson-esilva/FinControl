@@ -141,6 +141,7 @@ export interface ApiBill {
     icon: string
     dueDate: string
     isPaid: boolean
+    paidVia?: "EXTRACT" | "MANUAL" | null
     transactionId: string | null
     category?: { id: string; name: string; color?: string } | null
     account?: { id: string; name: string; } | null
@@ -174,10 +175,18 @@ export async function fetchBillCandidates(id: string, month: string): Promise<Ap
     }
 }
 
-export async function payBill(id: string, month: string, transactionId: string): Promise<boolean> {
+export async function payBill(
+    id: string,
+    month: string,
+    opts?: { transactionId?: string; accountId?: string },
+): Promise<boolean> {
     if (!hasApi) return false
     try {
-        await apiPost(`/recurring-expenses/${id}/pay`, { month, transactionId })
+        await apiPost(`/recurring-expenses/${id}/pay`, {
+            month,
+            transactionId: opts?.transactionId,
+            accountId: opts?.accountId,
+        })
         return true
     } catch {
         return false

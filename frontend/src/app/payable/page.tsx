@@ -36,7 +36,7 @@ import {
 } from "lucide-react"
 
 import { fetchBills, fetchBillCandidates, payBill, undoPayBill, type ApiBill, type ApiBillCandidate } from "@/lib/api-recurring"
-import { hasApi, toNum } from "@/lib/api-data"
+import { fetchAccounts, hasApi, toNum, type ApiAccount } from "@/lib/api-data"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -67,11 +67,13 @@ function getMonthName(date: Date) {
 export default function PayablePage() {
     const [currentDate, setCurrentDate] = useState(new Date())
     const [bills, setBills] = useState<ApiBill[]>([])
+    const [accounts, setAccounts] = useState<ApiAccount[]>([])
     const [loading, setLoading] = useState(true)
 
     const [payingBill, setPayingBill] = useState<ApiBill | null>(null)
     const [candidates, setCandidates] = useState<ApiBillCandidate[]>([])
     const [selectedTx, setSelectedTx] = useState<string>("")
+    const [selectedAccount, setSelectedAccount] = useState<string>("")
     const [loadingCandidates, setLoadingCandidates] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
 
@@ -84,8 +86,12 @@ export default function PayablePage() {
             return
         }
         try {
-            const fetchedBills = await fetchBills(monthStr)
+            const [fetchedBills, fetchedAccounts] = await Promise.all([
+                fetchBills(monthStr),
+                fetchAccounts(),
+            ])
             setBills(fetchedBills)
+            setAccounts(fetchedAccounts)
         } catch (err) {
             console.error(err)
         }
@@ -102,6 +108,7 @@ export default function PayablePage() {
             setSelectedTx("")
             return
         }
+        setSelectedAccount(payingBill.account?.id || accounts[0]?.id || "")
         let cancelled = false
         setLoadingCandidates(true)
         fetchBillCandidates(payingBill.recurringExpenseId, monthStr).then((list) => {
@@ -122,27 +129,43 @@ export default function PayablePage() {
     const handleNextMonth = () => setCurrentDate(prev => addMonths(prev, 1))
     const handleToday = () => setCurrentDate(new Date())
 
-    const handlePayConfirm = async () => {
+    const handleLinkExtract = async () => {
         if (!payingBill || !selectedTx) return
         setIsProcessing(true)
-        const success = await payBill(payingBill.recurringExpenseId, monthStr, selectedTx)
+        const success = await payBill(payingBill.recurringExpenseId, monthStr, { transactionId: selectedTx })
         setIsProcessing(false)
         if (success) {
             setPayingBill(null)
-            toast.success("Compromisso vinculado ao extrato.")
+            toast.success("Pago e vinculado ao extrato.")
             loadData()
         } else {
-            toast.error("Não foi possível vincular. Escolha outra linha do extrato.")
+            toast.error("Não foi possível vincular ao extrato.")
+        }
+    }
+
+    const handleMarkPaid = async () => {
+        if (!payingBill) return
+        setIsProcessing(true)
+        const success = await payBill(payingBill.recurringExpenseId, monthStr, {
+            accountId: selectedAccount || undefined,
+        })
+        setIsProcessing(false)
+        if (success) {
+            setPayingBill(null)
+            toast.success("Marcado como pago.")
+            loadData()
+        } else {
+            toast.error("Não foi possível marcar como pago. Escolha uma conta.")
         }
     }
 
     const handleUndoPay = async (billId: string, recurringId: string) => {
-        if (!confirm("Desvincular este compromisso do extrato? O lançamento do banco permanece.")) return
+        if (!confirm("Desfazer o pagamento deste mês? O extrato do banco, se houver, permanece.")) return
         setIsProcessing(true)
         const success = await undoPayBill(recurringId, monthStr)
         setIsProcessing(false)
         if (success) {
-            toast.success("Vínculo removido.")
+            toast.success("Pagamento desfeito.")
             loadData()
         } else {
             toast.error("Não foi possível desvincular.")
@@ -166,7 +189,7 @@ export default function PayablePage() {
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Contas a Pagar</h1>
                     <p className="text-muted-foreground">
-                        Compromissos do mês. “Pago” significa que a linha já apareceu no extrato.
+                        Marque o que já pagou neste mês. Se achar no extrato, pode vincular; se não achar, marque mesmo assim.
                     </p>
                 </div>
 
@@ -222,7 +245,7 @@ export default function PayablePage() {
             <Card className="overflow-hidden">
                 <div className="bg-muted p-4 space-y-2">
                     <div className="flex justify-between text-sm font-medium">
-                        <span className="text-emerald-600">Progresso no extrato</span>
+                        <span className="text-emerald-600">Progresso de pagamentos</span>
                         <span>{Math.round(progress)}% Concluído</span>
                     </div>
                     <Progress value={progress} className="h-3 bg-emerald-100 [&>div]:bg-emerald-500 dark:bg-emerald-950/50" />
@@ -247,7 +270,7 @@ export default function PayablePage() {
                         </h3>
                         {pendingBills.length === 0 && (
                             <div className="p-8 border rounded-xl border-dashed text-center text-muted-foreground text-sm">
-                                Todas as contas deste mês já estão no extrato.
+                                Todas as contas deste mês foram marcadas como pagas.
                             </div>
                         )}
                         <div className="grid gap-3">
@@ -297,12 +320,12 @@ export default function PayablePage() {
                                             <Dialog open={payingBill?.id === bill.id} onOpenChange={(open) => !open && setPayingBill(null)}>
                                                 <DialogTrigger asChild>
                                                     <Button size="sm" onClick={() => setPayingBill(bill)} className="gap-2">
-                                                        Vincular ao extrato <ArrowRight className="h-3.5 w-3.5" />
+                                                        Marcar pago <ArrowRight className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="sm:max-w-md">
                                                     <DialogHeader>
-                                                        <DialogTitle>Vincular ao extrato</DialogTitle>
+                                                        <DialogTitle>Marcar como pago</DialogTitle>
                                                     </DialogHeader>
                                                     <div className="space-y-4 py-4">
                                                         <div className="p-4 rounded-lg bg-muted flex items-center justify-between">
@@ -313,12 +336,12 @@ export default function PayablePage() {
                                                             <div className="text-xl font-bold">{formatCurrency(Number(bill.amount))}</div>
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Linha do extrato</label>
+                                                            <label className="text-sm font-medium">Linha do extrato (opcional)</label>
                                                             {loadingCandidates ? (
                                                                 <p className="text-sm text-muted-foreground">Buscando no extrato…</p>
                                                             ) : candidates.length === 0 ? (
                                                                 <p className="text-sm text-muted-foreground">
-                                                                    Nenhum lançamento com valor parecido neste mês. Sincronize a conta ou espere o débito aparecer no banco.
+                                                                    Nada parecido no extrato. Você pode marcar como pago mesmo assim.
                                                                 </p>
                                                             ) : (
                                                                 <Select value={selectedTx} onValueChange={setSelectedTx}>
@@ -335,9 +358,36 @@ export default function PayablePage() {
                                                                 </Select>
                                                             )}
                                                         </div>
-                                                        <Button className="w-full" disabled={isProcessing || !selectedTx} onClick={handlePayConfirm}>
-                                                            {isProcessing ? "Vinculando…" : "Confirmar vínculo"}
-                                                        </Button>
+                                                        <div className="space-y-2">
+                                                            <label className="text-sm font-medium">Conta (se marcar sem extrato)</label>
+                                                            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Selecione a conta…" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {accounts.map((acc) => (
+                                                                        <SelectItem key={acc.id} value={acc.id}>
+                                                                            {acc.name}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="flex flex-col gap-2">
+                                                            {candidates.length > 0 && (
+                                                                <Button className="w-full" disabled={isProcessing || !selectedTx} onClick={handleLinkExtract}>
+                                                                    {isProcessing ? "Salvando…" : "Vincular ao extrato"}
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                className="w-full"
+                                                                variant={candidates.length > 0 ? "outline" : "default"}
+                                                                disabled={isProcessing || !selectedAccount}
+                                                                onClick={handleMarkPaid}
+                                                            >
+                                                                {isProcessing ? "Salvando…" : "Marcar como pago mesmo sem extrato"}
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </DialogContent>
                                             </Dialog>
@@ -354,7 +404,7 @@ export default function PayablePage() {
                         </h3>
                         {paidBills.length === 0 && (
                             <div className="p-8 border rounded-xl border-dashed text-center text-muted-foreground text-sm">
-                                Nenhum compromisso vinculado ainda.
+                                Nenhum pagamento marcado ainda.
                             </div>
                         )}
                         <div className="grid gap-3">
@@ -374,7 +424,7 @@ export default function PayablePage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-0 flex gap-1 items-center shadow-none">
-                                                No extrato
+                                                {bill.paidVia === "EXTRACT" ? "No extrato" : "Pago"}
                                             </Badge>
                                             <Button
                                                 variant="ghost"
@@ -382,7 +432,7 @@ export default function PayablePage() {
                                                 className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                                                 onClick={() => handleUndoPay(bill.id, bill.recurringExpenseId)}
                                                 disabled={isProcessing}
-                                                title="Desvincular do extrato"
+                                                title="Desfazer pagamento"
                                             >
                                                 <Undo2 className="h-4 w-4" />
                                             </Button>

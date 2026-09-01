@@ -35,7 +35,7 @@ export class RecurringExpensesController {
 
     @Post(':id/pay')
     payBill(@Param('id') id: string, @Body() dto: LinkBillDto) {
-        return this.service.payBill(id, dto.month, dto.transactionId);
+        return this.service.payBill(id, dto.month, dto.transactionId, dto.accountId);
     }
 
     @Post(':id/undo-pay')

@@ -197,6 +197,7 @@ export class RecurringExpensesService {
                 icon: exp.icon,
                 dueDate: dueDate.toISOString(),
                 isPaid: !!tx,
+                paidVia: tx ? (tx.source === DataSource.PLUGGY ? 'EXTRACT' : 'MANUAL') : null,
                 transactionId: tx?.id || null,
                 category: exp.category,
                 account: exp.account,
@@ -263,18 +264,14 @@ export class RecurringExpensesService {
             .map(({ score: _score, ...rest }) => rest);
     }
 
-    /** Liga o compromisso a uma linha já existente no extrato. */
-    async payBill(id: string, month: string, transactionId?: string) {
-        if (!transactionId) {
-            throw new BadRequestException('Selecione uma linha do extrato para vincular.');
-        }
-
+    /** Pago = vínculo no extrato, ou registro manual do mês (sem mexer no saldo). */
+    async payBill(id: string, month: string, transactionId?: string, accountId?: string) {
         const expense = await this.prisma.recurringExpense.findFirst({
             where: { id, userId: USER_ID },
         });
         if (!expense) throw new NotFoundException('Compromisso não encontrado.');
 
-        const { startOfMonth, endOfMonth } = monthBounds(month);
+        const { startOfMonth, endOfMonth, year, m } = monthBounds(month);
 
         const already = await this.prisma.transaction.findFirst({
             where: {
@@ -285,9 +282,20 @@ export class RecurringExpensesService {
             },
         });
         if (already) {
-            throw new BadRequestException('Este compromisso já está vinculado a um lançamento neste mês.');
+            throw new BadRequestException('Este compromisso já está marcado como pago neste mês.');
         }
 
+        if (transactionId) {
+            return this.linkExtract(expense, transactionId);
+        }
+
+        return this.markPaidWithoutExtract(expense, year, m, startOfMonth, accountId);
+    }
+
+    private async linkExtract(
+        expense: { id: string; categoryId: string | null },
+        transactionId: string,
+    ) {
         const extract = await this.prisma.transaction.findFirst({
             where: { id: transactionId, userId: USER_ID },
         });
@@ -298,7 +306,7 @@ export class RecurringExpensesService {
         if (extract.status === 'CANCELLED') {
             throw new BadRequestException('Este lançamento foi anulado.');
         }
-        if (extract.recurringExpenseId && extract.recurringExpenseId !== id) {
+        if (extract.recurringExpenseId && extract.recurringExpenseId !== expense.id) {
             throw new BadRequestException('Este lançamento já está ligado a outro compromisso.');
         }
 
@@ -311,7 +319,52 @@ export class RecurringExpensesService {
         });
     }
 
-    /** Solta o vínculo com o extrato. Não apaga o lançamento nem altera saldo. */
+    private async markPaidWithoutExtract(
+        expense: { id: string; name: string; amount: unknown; dueDay: number | null; categoryId: string | null; accountId: string | null },
+        year: number,
+        m: number,
+        startOfMonth: Date,
+        accountId?: string,
+    ) {
+        const chosenAccountId = accountId || expense.accountId;
+        if (!chosenAccountId) {
+            throw new BadRequestException('Escolha uma conta para registrar o pagamento.');
+        }
+
+        let catId = expense.categoryId;
+        if (!catId) {
+            const fallbackCat = await this.prisma.category.findFirst({
+                where: { userId: USER_ID, type: 'EXPENSE' },
+            });
+            if (!fallbackCat) {
+                throw new BadRequestException('Crie uma categoria de despesa antes de marcar como pago.');
+            }
+            catId = fallbackCat.id;
+        }
+
+        const lastDay = new Date(year, m + 1, 0).getDate();
+        let dueDay = expense.dueDay || startOfMonth.getUTCDate();
+        if (dueDay > lastDay) dueDay = lastDay;
+        const txDate = new Date(Date.UTC(year, m, dueDay, 12, 0, 0));
+
+        return this.prisma.transaction.create({
+            data: {
+                userId: USER_ID,
+                accountId: chosenAccountId,
+                categoryId: catId,
+                amount: expense.amount as any,
+                date: txDate,
+                description: `Pagamento: ${expense.name}`,
+                type: 'EXPENSE',
+                status: 'COMPLETED',
+                isRecurring: true,
+                recurringExpenseId: expense.id,
+                metadata: { paidWithoutExtract: true },
+            },
+        });
+    }
+
+    /** Desfaz o pago do mês. Extrato do banco permanece; marcação manual é anulada. Sem alterar saldo. */
     async undoPayBill(id: string, month: string) {
         const { startOfMonth, endOfMonth } = monthBounds(month);
 
@@ -325,13 +378,20 @@ export class RecurringExpensesService {
         });
 
         if (!existingTx) {
-            throw new BadRequestException('Nenhum vínculo encontrado para este mês.');
+            throw new BadRequestException('Nenhum pagamento encontrado para este mês.');
         }
 
-        await this.prisma.transaction.update({
-            where: { id: existingTx.id },
-            data: { recurringExpenseId: null },
-        });
+        if (existingTx.source === DataSource.PLUGGY) {
+            await this.prisma.transaction.update({
+                where: { id: existingTx.id },
+                data: { recurringExpenseId: null },
+            });
+        } else {
+            await this.prisma.transaction.update({
+                where: { id: existingTx.id },
+                data: { status: 'CANCELLED', recurringExpenseId: null },
+            });
+        }
 
         return { success: true };
     }
