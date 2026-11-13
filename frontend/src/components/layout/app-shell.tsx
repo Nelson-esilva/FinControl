@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="min-w-0 flex-1">
           <MobileHeader />
-          <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-8">
+          <main className="flex w-full flex-col gap-6 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
             {children}
           </main>
         </div>
