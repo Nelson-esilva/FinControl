@@ -5,13 +5,14 @@ browser (Next.js :3000)
   ├─ App Router  src/app/<rota>/page.tsx
   ├─ Auth UI     contexts/auth-context.tsx  → localStorage "fincontrol_user"
   ├─ HTTP        lib/api.ts  →  NEXT_PUBLIC_API_URL
-  └─ (legado)    app/actions/* + lib/prisma.ts   ← não expandir
+  └─ Domínio     lib/finance/{client,types,format}.ts + lib/hooks/use-api.ts
 
 NestJS API (:3001)
   ├─ main.ts     ValidationPipe + CORS (FRONTEND_URL)
   ├─ módulos     auth, users, accounts, categories, transactions,
-  │              budgets, notifications, attachments, dashboard,
-  │              recurring-expenses, upload
+  │              budgets, notifications, attachments, analytics,
+  │              recurring-expenses, upload, pluggy (opcional)
+  ├─ regras      ledger/rules.ts (puro) + accounts/ledger-balance.ts (saldo)
   ├─ Prisma      backend/prisma/schema.prisma  → PostgreSQL :5433
   └─ extras      Cloudinary (avatar/anexo) | uploads locais | Resend (reset)
 
@@ -26,12 +27,13 @@ Um único git na raiz `FinControl/`. `npm` + lockfiles separados em `backend/` e
 | --- | --- | --- |
 | Auth | `auth/` | `POST /auth/{register,login,forgot-password,reset-password,change-password}` |
 | Users | `users/` | `CRUD /users`, `POST /users/:id/avatar` |
-| Accounts | `accounts/` | `CRUD /accounts` |
+| Accounts | `accounts/` | `CRUD /accounts` (resumo com fatura/rendimento), `GET/POST /accounts/:id/valuations`, `GET /accounts/:id/invoices/:month` |
 | Categories | `categories/` | `CRUD /categories?type=` |
-| Transactions | `transactions/` | `CRUD /transactions`, `PATCH /transactions/:id/pay` |
-| Recurring | `recurring-expenses/` | CRUD + `summary`, `bills/:month`, `:id/pay`, `:id/undo-pay` |
-| Budgets | `budgets/` | `CRUD /budgets` |
-| Dashboard | `dashboard/` | `GET /dashboard` |
+| Transactions | `transactions/` | `CRUD /transactions` (filtros q/tag/nature/installments), `PATCH :id/pay`, `PATCH :id/unpay`, `DELETE :id?scope=all`, `GET /transactions/tags` |
+| Recurring | `recurring-expenses/` | CRUD + `summary`, `bills/:month`, `:id/candidates`, `:id/pay`, `:id/undo-pay` |
+| Budgets | `budgets/` | `POST` (upsert por categoria), `GET ?month=`, `PUT/DELETE :id` |
+| Analytics | `analytics/` | `GET overview`, `spending?groupBy=`, `cashflow`, `net-worth` |
+| Pluggy | `pluggy/` | items, sync, webhooks (opcional; UI em Configurações) |
 | Notifications | `notifications/` | list/read/`read-all` |
 | Attachments | `attachments/` | por transação |
 | Health | `health.controller.ts` | `GET /health` |
@@ -44,19 +46,20 @@ Não há JWT/guard nas rotas. Login devolve `{ user }` sem token.
 
 | Rota | Papel |
 | --- | --- |
-| `/dashboard` | KPIs, gráficos, recentes |
-| `/payable` | Contas a pagar / faturas do mês |
-| `/transactions` | Receitas, despesas, parcelas |
-| `/wallet` | Contas, cartões, saldos |
-| `/budget` | Orçamentos por categoria |
-| `/expenses` | Despesas fixas / recorrentes |
+| `/` | Visão geral: livre para gastar, KPIs, próximos vencimentos |
+| `/lancamentos` | Lançamentos por dia, busca, filtros, formulário |
+| `/compromissos` | Contas do mês (lista/calendário/cadastrados), faturas, dívidas |
+| `/orcamento` | Limite mensal por categoria + ritmo |
+| `/patrimonio` | Contas, cartões, investimentos, patrimônio líquido |
+| `/analises` | Onde / quando / por quê |
 | `/users` | Lista (SUPERUSER) |
 | `/profile`, `/settings` | Perfil e preferências |
 | `/login`, `/signup`, `/forgot-password`, `/reset-password` | Auth pública |
 
-- Shell: `components/layout/{app-shell,sidebar,top-bar}.tsx`.
+- Shell: `components/layout/{app-shell,sidebar,mobile-nav}.tsx`. Lançamento rápido global (tecla N): `components/finance/quick-add.tsx`.
+- Componentes de domínio: `components/finance/*`. Rotas antigas redirecionam em `next.config.js`.
 - UI: shadcn em `components/ui/`; não copie esses primitivos.
-- Cliente: `lib/api.ts` (get/post/put/delete/upload). Domínio em `lib/api-data.ts` e `lib/api-recurring.ts`.
+- Cliente: `lib/api.ts` (get/post/put/delete/upload). Domínio em `lib/finance/client.ts`; `lib/api-data.ts` só usuários/perfil/Pluggy.
 - `hasApi` cai para arrays vazios se `NEXT_PUBLIC_API_URL` faltar — preserve o fallback, não silencie erro de escrita sem necessidade.
 - `DEFAULT_USER_ID = "user-id"` em `api-data.ts` espelha o backend.
 

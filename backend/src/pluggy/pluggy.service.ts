@@ -7,6 +7,7 @@ import {
 import { AccountType, DataSource, Prisma, TransactionStatus, TransactionType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
+import { businessDate, invoiceMonthFor } from '../ledger/rules';
 import { PluggyClient, PluggyAccountPayload, PluggyItemPayload, PluggyTransactionPayload } from './pluggy.client';
 import { PluggyWebhookDto } from './dto/pluggy-webhook.dto';
 import { RegisterPluggyItemDto } from './dto/register-item.dto';
@@ -297,6 +298,13 @@ export class PluggyService {
       accountId = account?.id;
     }
     if (!accountId) return;
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      select: { type: true, closingDay: true },
+    });
+    // Compra no cartão entra na fatura pelo dia de fechamento.
+    const invoiceMonth =
+      account?.type === AccountType.CREDIT_CARD ? invoiceMonthFor(businessDate(date), account.closingDay) : null;
 
     const existing = await this.prisma.transaction.findUnique({
       where: { pluggyTransactionId: payload.id },
@@ -314,6 +322,7 @@ export class PluggyService {
       categoryId: keepUserCategory ? existing.categoryId : matchedId,
       accountId,
       source: DataSource.PLUGGY,
+      invoiceMonth,
       metadata: payload.category ? { pluggyCategory: payload.category } : undefined,
     };
 

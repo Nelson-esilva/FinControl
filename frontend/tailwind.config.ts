@@ -16,7 +16,7 @@ const config: Config = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
+          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
@@ -43,17 +43,10 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom Fintech Colors
-        income: {
-          DEFAULT: "#10b981",
-          light: "#34d399",
-          dark: "#059669",
-        },
-        expense: {
-          DEFAULT: "#f43f5e",
-          light: "#fb7185",
-          dark: "#e11d48",
-        },
+        income: "hsl(var(--income) / <alpha-value>)",
+        expense: "hsl(var(--expense) / <alpha-value>)",
+        warning: "hsl(var(--warning) / <alpha-value>)",
+        track: "hsl(var(--track) / <alpha-value>)",
         indigo: {
           50: "#eef2ff",
           100: "#e0e7ff",

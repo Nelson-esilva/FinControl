@@ -1,178 +1,298 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { DataSource } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { AccountType, DataSource, Prisma, SpendingNature, TransactionStatus, TransactionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { Decimal } from '@prisma/client/runtime/library';
-import { applyLedgerBalanceIfManual, hideSyntheticLedgerTx } from '../accounts/ledger-balance';
+import { applyTransactionEffects } from '../accounts/ledger-balance';
+import {
+  addMonths,
+  addMonthsToKey,
+  businessDate,
+  fromCents,
+  invoiceMonthFor,
+  splitInstallments,
+  toCents,
+} from '../ledger/rules';
 
 const USER_ID = 'user-id';
 
+export interface TransactionFilters {
+  type?: string;
+  status?: string;
+  accountId?: string;
+  categoryId?: string;
+  nature?: string;
+  tag?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+  source?: string;
+  parentTransactionId?: string;
+  installments?: string; // "1" = só parcelados
+  limit?: string;
+}
+
+export const TRANSACTION_INCLUDE = {
+  account: { select: { id: true, name: true, type: true, color: true } },
+  transferAccount: { select: { id: true, name: true, type: true, color: true } },
+  category: { select: { id: true, name: true, color: true, icon: true, type: true } },
+} satisfies Prisma.TransactionInclude;
+
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
+
+  private async getAccount(id: string) {
+    const account = await this.prisma.account.findFirst({ where: { id, userId: USER_ID } });
+    if (!account) throw new NotFoundException('Conta não encontrada.');
+    return account;
+  }
+
+  private async validateRelations(dto: {
+    type?: string;
+    accountId?: string;
+    transferAccountId?: string | null;
+    categoryId?: string | null;
+  }) {
+    if (dto.type === 'PAYMENT') {
+      if (!dto.transferAccountId) {
+        throw new BadRequestException('Transferência precisa da conta de destino.');
+      }
+      if (dto.transferAccountId === dto.accountId) {
+        throw new BadRequestException('A conta de destino deve ser diferente da de origem.');
+      }
+      await this.getAccount(dto.transferAccountId);
+    }
+    if (dto.categoryId) {
+      const cat = await this.prisma.category.findFirst({ where: { id: dto.categoryId, userId: USER_ID } });
+      if (!cat) throw new NotFoundException('Categoria não encontrada.');
+      if (dto.type && dto.type !== 'PAYMENT' && cat.type !== dto.type) {
+        throw new BadRequestException('A categoria não é do mesmo tipo do lançamento.');
+      }
+    }
+  }
 
   async create(dto: CreateTransactionDto) {
-    const totalInstallments = dto.totalInstallments && dto.totalInstallments > 1 ? dto.totalInstallments : 1;
+    const account = await this.getAccount(dto.accountId);
+    await this.validateRelations(dto);
 
-    const totalAmount = typeof dto.amount === 'string' ? parseFloat(dto.amount) : dto.amount;
-    const baseAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
-    const remainder = Math.round((totalAmount - baseAmount * totalInstallments) * 100) / 100;
+    const isPayment = dto.type === 'PAYMENT';
+    const isCard = account.type === AccountType.CREDIT_CARD;
+    const count = !isPayment && dto.totalInstallments && dto.totalInstallments > 1 ? dto.totalInstallments : 1;
+    const parts = splitInstallments(toCents(dto.amount), count);
+    const firstDate = businessDate(dto.date);
+    const firstInvoice = isCard && !isPayment ? invoiceMonthFor(firstDate, account.closingDay) : null;
+    const tags = normalizeTags(dto.tags);
 
     return this.prisma.$transaction(async (tx) => {
-      let firstTransactionId = null;
-      let firstTransaction = null;
+      let parentId: string | null = null;
+      let first: Prisma.TransactionGetPayload<{ include: typeof TRANSACTION_INCLUDE }> | null = null;
 
-      for (let i = 1; i <= totalInstallments; i++) {
-        const isFirst = i === 1;
-        // O primeiro mês absorve os centavos restantes para fechar a conta
-        const installmentAmount = isFirst ? baseAmount + remainder : baseAmount;
-
-        const date = new Date(dto.date);
-        date.setMonth(date.getMonth() + (i - 1));
-
-        const status: string = isFirst ? (dto.status ?? 'COMPLETED') : 'SCHEDULED';
-
-        const data: any = {
-          userId: USER_ID,
-          accountId: dto.accountId,
-          categoryId: dto.categoryId,
-          amount: new Decimal(installmentAmount),
-          date,
-          description: totalInstallments > 1 ? `${dto.description} (${i}/${totalInstallments})` : dto.description,
-          type: dto.type,
-          status,
-          installmentNumber: totalInstallments > 1 ? i : dto.installmentNumber,
-          totalInstallments: totalInstallments > 1 ? totalInstallments : dto.totalInstallments,
-          isRecurring: dto.isRecurring ?? false,
-          recurringFrequency: dto.recurringFrequency,
-          metadata: dto.metadata,
-        };
-
-        if (!isFirst && firstTransactionId) {
-          data.parentTransactionId = firstTransactionId;
-        }
-
-        const transaction = await tx.transaction.create({ data });
-
-        if (isFirst) {
-          firstTransactionId = transaction.id;
-          firstTransaction = transaction;
-        }
-
-        if (status === 'COMPLETED') {
-          const balanceChange = dto.type === 'INCOME' ? installmentAmount : -installmentAmount;
-          await applyLedgerBalanceIfManual(tx, dto.accountId, balanceChange);
+      for (let i = 0; i < count; i++) {
+        // Compra no cartão vira dívida inteira na hora (todas COMPLETED, uma por fatura).
+        // Fora do cartão, parcelas futuras ficam SCHEDULED e só mexem no saldo ao pagar.
+        const status = i === 0 || isCard ? (dto.status ?? 'COMPLETED') : 'SCHEDULED';
+        const row: Prisma.TransactionGetPayload<{ include: typeof TRANSACTION_INCLUDE }> = await tx.transaction.create({
+          data: {
+            userId: USER_ID,
+            accountId: account.id,
+            transferAccountId: isPayment ? dto.transferAccountId : null,
+            categoryId: isPayment ? null : (dto.categoryId ?? null),
+            amount: new Prisma.Decimal(fromCents(parts[i]).toFixed(2)),
+            date: addMonths(firstDate, i),
+            description: dto.description.trim(),
+            type: dto.type,
+            status,
+            nature: dto.type === 'EXPENSE' ? (dto.nature ?? null) : null,
+            note: dto.note?.trim() || null,
+            tags,
+            installmentNumber: count > 1 ? i + 1 : null,
+            totalInstallments: count > 1 ? count : null,
+            parentTransactionId: parentId,
+            invoiceMonth: firstInvoice ? addMonthsToKey(firstInvoice, i) : isPayment ? (dto.invoiceMonth ?? null) : null,
+          },
+          include: TRANSACTION_INCLUDE,
+        });
+        await applyTransactionEffects(tx, row, 1);
+        if (i === 0) {
+          parentId = row.id;
+          first = row;
         }
       }
-
-      return firstTransaction;
+      return first;
     });
   }
 
-  findAll(filters?: { type?: string; accountId?: string; categoryId?: string; from?: string; to?: string; status?: string; parentTransactionId?: string; source?: string }) {
-    const where: Record<string, unknown> = { userId: USER_ID, ...hideSyntheticLedgerTx };
-    if (filters?.type) where.type = filters.type;
-    if (filters?.accountId) where.accountId = filters.accountId;
-    if (filters?.categoryId) where.categoryId = filters.categoryId;
-    if (filters?.source) where.source = filters.source;
-    if (filters?.status) where.status = filters.status;
-    else where.status = { not: 'CANCELLED' };
-    if (filters?.parentTransactionId) where.parentTransactionId = filters.parentTransactionId;
-    if (filters?.from || filters?.to) {
-      where.date = {};
-      if (filters.from) (where.date as Record<string, Date>).gte = parseDayBound(filters.from, false);
-      if (filters.to) (where.date as Record<string, Date>).lte = parseDayBound(filters.to, true);
+  findAll(f: TransactionFilters = {}) {
+    const where: Prisma.TransactionWhereInput = { userId: USER_ID };
+    if (f.type) where.type = f.type as TransactionType;
+    where.status = f.status ? (f.status as TransactionStatus) : { not: 'CANCELLED' };
+    if (f.accountId) where.OR = [{ accountId: f.accountId }, { transferAccountId: f.accountId }];
+    if (f.categoryId) where.categoryId = f.categoryId;
+    if (f.nature) where.nature = f.nature as SpendingNature;
+    if (f.tag) where.tags = { has: f.tag.toLowerCase() };
+    if (f.source) where.source = f.source as DataSource;
+    if (f.parentTransactionId) where.parentTransactionId = f.parentTransactionId;
+    if (f.installments === '1') where.totalInstallments = { gt: 1 };
+    if (f.q?.trim()) {
+      const q = f.q.trim();
+      where.AND = [
+        {
+          OR: [
+            { description: { contains: q, mode: 'insensitive' } },
+            { note: { contains: q, mode: 'insensitive' } },
+            { tags: { has: q.replace(/^#/, '').toLowerCase() } },
+            { category: { name: { contains: q, mode: 'insensitive' } } },
+          ],
+        },
+      ];
     }
+    if (f.from || f.to) {
+      const date: Prisma.DateTimeFilter = {};
+      if (f.from) date.gte = new Date(`${f.from.slice(0, 10)}T00:00:00.000Z`);
+      if (f.to) date.lte = new Date(`${f.to.slice(0, 10)}T23:59:59.999Z`);
+      where.date = date;
+    }
+    const limit = Math.min(Number(f.limit) || 500, 2000);
     return this.prisma.transaction.findMany({
       where,
-      include: { account: true, category: true },
-      orderBy: { date: 'asc' },
+      include: TRANSACTION_INCLUDE,
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      take: limit,
     });
   }
 
-  findOne(id: string) {
-    return this.prisma.transaction.findFirstOrThrow({
-      where: { id, userId: USER_ID },
-      include: { account: true, category: true, attachments: true, childTransactions: true },
+  async listTags() {
+    const rows = await this.prisma.transaction.findMany({
+      where: { userId: USER_ID, tags: { isEmpty: false } },
+      select: { tags: true },
+      take: 2000,
+      orderBy: { date: 'desc' },
     });
+    return Array.from(new Set(rows.flatMap((r) => r.tags))).sort();
+  }
+
+  async findOne(id: string) {
+    const row = await this.prisma.transaction.findFirst({
+      where: { id, userId: USER_ID },
+      include: { ...TRANSACTION_INCLUDE, attachments: true, childTransactions: { orderBy: { installmentNumber: 'asc' } } },
+    });
+    if (!row) throw new NotFoundException('Lançamento não encontrado.');
+    return row;
   }
 
   async update(id: string, dto: UpdateTransactionDto) {
-    const existing = await this.prisma.transaction.findFirstOrThrow({
-      where: { id, userId: USER_ID },
-    });
+    const existing = await this.findOne(id);
+    const type = dto.type ?? existing.type;
+    const accountId = dto.accountId ?? existing.accountId;
+    const transferAccountId =
+      type === 'PAYMENT' ? (dto.transferAccountId ?? existing.transferAccountId) : null;
+    const categoryId = type === 'PAYMENT' ? null : dto.categoryId !== undefined ? dto.categoryId : existing.categoryId;
+    const account = await this.getAccount(accountId);
+    await this.validateRelations({ type, accountId, transferAccountId, categoryId });
+
+    if (existing.source === DataSource.PLUGGY && (dto.amount != null || dto.accountId || dto.type)) {
+      throw new BadRequestException('Lançamento do extrato: só categoria, natureza, tags e nota podem mudar.');
+    }
+
+    const date = dto.date ? businessDate(dto.date) : existing.date;
+    const invoiceMonth =
+      account.type === AccountType.CREDIT_CARD && type !== 'PAYMENT'
+        ? dto.date || dto.accountId
+          ? invoiceMonthFor(date, account.closingDay)
+          : existing.invoiceMonth
+        : type === 'PAYMENT'
+          ? (dto.invoiceMonth ?? existing.invoiceMonth)
+          : null;
 
     return this.prisma.$transaction(async (tx) => {
-      if (existing.status === 'COMPLETED') {
-        const revertAdjustment = existing.type === 'INCOME' ? -Number(existing.amount) : Number(existing.amount);
-        await applyLedgerBalanceIfManual(tx, existing.accountId, revertAdjustment);
-      }
-
-      const data: Record<string, unknown> = { ...dto };
-      if (dto.amount != null) data.amount = new Decimal(dto.amount);
-      if (dto.date) data.date = new Date(dto.date);
-
-      const updated = await tx.transaction.update({ where: { id }, data });
-
-      if (updated.status === 'COMPLETED') {
-        const applyAdjustment = updated.type === 'INCOME' ? Number(updated.amount) : -Number(updated.amount);
-        await applyLedgerBalanceIfManual(tx, updated.accountId, applyAdjustment);
-      }
-
+      await applyTransactionEffects(tx, existing, -1);
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: {
+          type,
+          accountId,
+          transferAccountId,
+          categoryId,
+          date,
+          invoiceMonth,
+          status: dto.status ?? existing.status,
+          description: dto.description?.trim() ?? existing.description,
+          amount: dto.amount != null ? new Prisma.Decimal(dto.amount.toFixed(2)) : existing.amount,
+          nature: type === 'EXPENSE' ? (dto.nature !== undefined ? dto.nature : existing.nature) : null,
+          note: dto.note !== undefined ? dto.note.trim() || null : existing.note,
+          tags: dto.tags !== undefined ? normalizeTags(dto.tags) : existing.tags,
+        },
+        include: TRANSACTION_INCLUDE,
+      });
+      await applyTransactionEffects(tx, updated, 1);
       return updated;
     });
   }
 
   async pay(id: string) {
-    const existing = await this.prisma.transaction.findFirstOrThrow({
-      where: { id, userId: USER_ID },
-    });
-
-    if (existing.status === 'COMPLETED') {
-      throw new BadRequestException('Transaction is already paid');
-    }
-    if (existing.source === DataSource.PLUGGY) {
-      throw new BadRequestException('Lançamento do extrato não é pago pelo app.');
-    }
-
+    const existing = await this.findOne(id);
+    if (existing.status === 'COMPLETED') throw new BadRequestException('Este lançamento já está pago.');
+    if (existing.status === 'CANCELLED') throw new BadRequestException('Lançamento anulado.');
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.transaction.update({
         where: { id },
         data: { status: 'COMPLETED' },
+        include: TRANSACTION_INCLUDE,
       });
-
-      const applyAdjustment = updated.type === 'INCOME' ? Number(updated.amount) : -Number(updated.amount);
-      await applyLedgerBalanceIfManual(tx, updated.accountId, applyAdjustment);
-
+      await applyTransactionEffects(tx, updated, 1);
       return updated;
     });
   }
 
-  async remove(id: string) {
-    const tx = await this.prisma.transaction.findFirstOrThrow({
-      where: { id, userId: USER_ID },
+  async unpay(id: string) {
+    const existing = await this.findOne(id);
+    if (existing.status !== 'COMPLETED') throw new BadRequestException('Este lançamento não está pago.');
+    if (existing.source === DataSource.PLUGGY) throw new BadRequestException('Lançamento do extrato não pode ser desfeito.');
+    return this.prisma.$transaction(async (tx) => {
+      await applyTransactionEffects(tx, existing, -1);
+      return tx.transaction.update({ where: { id }, data: { status: 'SCHEDULED' }, include: TRANSACTION_INCLUDE });
     });
+  }
 
-    return this.prisma.$transaction(async (prismaTx) => {
-      if (tx.status === 'COMPLETED') {
-        const balanceRevert = tx.type === 'INCOME'
-          ? -Number(tx.amount)
-          : Number(tx.amount);
-        await applyLedgerBalanceIfManual(prismaTx, tx.accountId, balanceRevert);
+  /** scope "all" apaga o parcelamento inteiro a partir do lançamento pai. */
+  async remove(id: string, scope: 'one' | 'all' = 'one') {
+    const existing = await this.findOne(id);
+    const rootId = existing.parentTransactionId ?? existing.id;
+    const rows =
+      scope === 'all' && existing.totalInstallments
+        ? await this.prisma.transaction.findMany({
+            where: { userId: USER_ID, OR: [{ id: rootId }, { parentTransactionId: rootId }] },
+          })
+        : [existing];
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const row of rows) await applyTransactionEffects(tx, row, -1);
+      const ids = rows.map((r) => r.id);
+      if (scope === 'one' && existing.childTransactions.length > 0) {
+        // Apagar só o pai: a próxima parcela vira o novo pai (a FK tem cascade).
+        const [next, ...others] = existing.childTransactions;
+        await tx.transaction.update({ where: { id: next.id }, data: { parentTransactionId: null } });
+        await tx.transaction.updateMany({
+          where: { id: { in: others.map((o) => o.id) } },
+          data: { parentTransactionId: next.id },
+        });
       }
-      return prismaTx.transaction.delete({ where: { id } });
+      // Filhas primeiro para não violar a FK do pai.
+      await tx.transaction.deleteMany({ where: { id: { in: ids }, parentTransactionId: { not: null } } });
+      await tx.transaction.deleteMany({ where: { id: { in: ids } } });
+      return { deleted: ids.length };
     });
   }
 }
 
-function parseDayBound(value: string, endOfDay: boolean): Date {
-  const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  if (dayOnly) {
-    const [year, month, day] = value.split('-').map(Number);
-    return endOfDay
-      ? new Date(year, month - 1, day, 23, 59, 59, 999)
-      : new Date(year, month - 1, day, 0, 0, 0, 0);
-  }
-  return new Date(value);
+function normalizeTags(tags?: string[]): string[] {
+  if (!tags) return [];
+  return Array.from(
+    new Set(
+      tags
+        .map((t) => t.trim().replace(/^#/, '').toLowerCase().replace(/\s+/g, '-'))
+        .filter((t) => t.length > 0),
+    ),
+  );
 }

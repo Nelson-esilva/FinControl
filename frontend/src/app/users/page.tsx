@@ -17,7 +17,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (!isSuperUser) {
-      router.replace("/dashboard")
+      router.replace("/")
       return
     }
     fetchUsers().then((data) => {

@@ -2,52 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @layer base {
+  /* Tema claro */
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 240 14% 97%;
+    --foreground: 225 14% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 225 14% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
-    --radius: 0.75rem;
+    --popover-foreground: 225 14% 9%;
+    --primary: 240 64% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 228 14% 93%;
+    --secondary-foreground: 225 14% 12%;
+    --muted: 228 14% 94%;
+    --muted-foreground: 220 10% 38%;
+    --accent: 228 14% 93%;
+    --accent-foreground: 225 14% 12%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 228 13% 88%;
+    --input: 228 13% 85%;
+    --ring: 240 64% 58%;
+    --radius: 0.875rem;
+    --income: 202 89% 36%;
+    --expense: 25 88% 40%;
+    --warning: 36 92% 33%;
+    --track: 228 14% 90%;
   }
 
+  /* Tema escuro (padrão) — FinControl 2.0 */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 8%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 243 75% 59%;
+    --background: 228 16% 6%;
+    --foreground: 220 14% 96%;
+    --card: 225 14% 10%;
+    --card-foreground: 220 14% 96%;
+    --popover: 225 14% 10%;
+    --popover-foreground: 220 14% 96%;
+    --primary: 240 100% 77%;
+    --primary-foreground: 228 16% 6%;
+    --secondary: 222 14% 14%;
+    --secondary-foreground: 220 14% 96%;
+    --muted: 222 14% 14%;
+    --muted-foreground: 218 10% 64%;
+    --accent: 222 14% 14%;
+    --accent-foreground: 220 14% 96%;
+    --destructive: 0 72% 62%;
+    --destructive-foreground: 228 16% 6%;
+    --border: 223 14% 16%;
+    --input: 223 13% 20%;
+    --ring: 240 100% 77%;
+    --income: 200 100% 68%;
+    --expense: 21 100% 71%;
+    --warning: 43 92% 63%;
+    --track: 223 14% 16%;
   }
 }
 
@@ -57,6 +65,12 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .num {
+    font-variant-numeric: tabular-nums;
   }
 }
 

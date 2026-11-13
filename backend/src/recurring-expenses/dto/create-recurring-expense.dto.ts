@@ -1,81 +1,77 @@
-import { IsString, IsOptional, IsNumber, IsEnum, IsInt, IsDateString, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
-enum RecurringType {
-    FIXED = 'FIXED',
-    INSTALLMENT = 'INSTALLMENT',
-    CREDIT_CARD = 'CREDIT_CARD',
-    LOAN = 'LOAN',
-    SUBSCRIPTION = 'SUBSCRIPTION',
-}
-
-enum RecurringFrequency {
-    WEEKLY = 'WEEKLY',
-    MONTHLY = 'MONTHLY',
-    YEARLY = 'YEARLY',
-}
+export const RECURRING_TYPES = ['FIXED', 'SUBSCRIPTION', 'INSTALLMENT', 'LOAN', 'INCOME'] as const;
+export const RECURRING_FREQUENCIES = ['WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 
 export class CreateRecurringExpenseDto {
-    @IsString()
-    name: string;
+  @IsString()
+  @MaxLength(80)
+  name: string;
 
-    @IsOptional()
-    @IsString()
-    description?: string;
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  description?: string;
 
-    @IsEnum(RecurringType)
-    type: RecurringType;
+  @IsIn(RECURRING_TYPES)
+  type: (typeof RECURRING_TYPES)[number];
 
-    @IsNumber()
-    amount: number;
+  /** Valor de cada ocorrência (parcela, mensalidade, salário). */
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount: number;
 
-    @IsOptional()
-    @IsEnum(RecurringFrequency)
-    frequency?: RecurringFrequency;
+  @IsOptional()
+  @IsIn(RECURRING_FREQUENCIES)
+  frequency?: (typeof RECURRING_FREQUENCIES)[number];
 
-    @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Max(31)
-    dueDay?: number;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  dueDay: number;
 
-    @IsDateString()
-    startDate: string;
+  @IsDateString()
+  startDate: string;
 
-    @IsOptional()
-    @IsDateString()
-    endDate?: string;
+  @IsOptional()
+  @IsDateString()
+  endDate?: string | null;
 
-    @IsOptional()
-    @IsInt()
-    @Min(1)
-    currentInstallment?: number;
+  /** Parcela que vence no mês de início (ex.: cadastro na 23ª de 48). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  firstInstallment?: number;
 
-    @IsOptional()
-    @IsInt()
-    @Min(1)
-    totalInstallments?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  totalInstallments?: number | null;
 
-    @IsOptional()
-    @IsNumber()
-    interestRate?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  interestRate?: number | null;
 
-    @IsOptional()
-    @IsString()
-    cardName?: string;
+  @IsOptional()
+  @IsString()
+  color?: string;
 
-    @IsOptional()
-    @IsString()
-    color?: string;
+  @IsOptional()
+  @IsString()
+  icon?: string;
 
-    @IsOptional()
-    @IsString()
-    icon?: string;
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string | null;
 
-    @IsOptional()
-    @IsString()
-    categoryId?: string;
-
-    @IsOptional()
-    @IsString()
-    accountId?: string;
+  @IsOptional()
+  @IsUUID()
+  accountId?: string | null;
 }

@@ -48,7 +48,7 @@ enum DataSource {
 }
 
 // ============================================
-// ACCOUNTS (Bank Accounts, Credit Cards, Investments)
+// ACCOUNTS (conta corrente, poupança, investimento, cartão, carteira)
 // ============================================
 enum AccountType {
   CHECKING
@@ -63,11 +63,14 @@ model Account {
   id              String      @id @default(uuid())
   name            String
   type            AccountType
+  institution     String?
   initialBalance  Decimal     @default(0) @map("initial_balance") @db.Decimal(15, 2)
+  // Cartão: negativo = valor devido. Investimento: valor contábil (aportes − resgates).
   currentBalance  Decimal     @default(0) @map("current_balance") @db.Decimal(15, 2)
   creditLimit     Decimal?    @map("credit_limit") @db.Decimal(15, 2)
+  closingDay      Int?        @map("closing_day")
   dueDate         Int?        @map("due_date")
-  color           String      @default("#6366f1")
+  color           String      @default("#8B8CFF")
   icon            String      @default("Wallet")
   isActive        Boolean     @default(true) @map("is_active")
   source          DataSource  @default(MANUAL)
@@ -76,23 +79,40 @@ model Account {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String        @map("user_id")
-  pluggyItem      PluggyItem? @relation(fields: [pluggyItemId], references: [id], onDelete: SetNull)
-  pluggyItemId    String?     @map("pluggy_item_id")
-  transactions      Transaction[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String             @map("user_id")
+  pluggyItem        PluggyItem?        @relation(fields: [pluggyItemId], references: [id], onDelete: SetNull)
+  pluggyItemId      String?            @map("pluggy_item_id")
+  transactions      Transaction[]      @relation("TransactionAccount")
+  transfersIn       Transaction[]      @relation("TransactionTransferAccount")
   recurringExpenses RecurringExpense[]
+  valuations        AccountValuation[]
 
+  @@index([userId])
   @@map("accounts")
 }
 
+// Valor de mercado informado manualmente para conta de investimento.
+model AccountValuation {
+  id        String   @id @default(uuid())
+  date      DateTime
+  value     Decimal  @db.Decimal(15, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String  @map("account_id")
+
+  @@index([accountId, date])
+  @@map("account_valuations")
+}
+
 // ============================================
-// CATEGORIES (Income & Expense Categories)
+// CATEGORIES
 // ============================================
 enum TransactionType {
   INCOME
   EXPENSE
-  PAYMENT
+  PAYMENT // movimento entre contas próprias (fatura, aporte, resgate) — nunca é gasto nem receita
 }
 
 model Category {
@@ -100,14 +120,14 @@ model Category {
   name        String
   description String?
   type        TransactionType
-  color       String          @default("#6366f1")
+  color       String          @default("#8B8CFF")
   icon        String          @default("Tag")
   isDefault   Boolean         @default(false) @map("is_default")
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String        @map("user_id")
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String             @map("user_id")
   transactions      Transaction[]
   budgets           Budget[]
   recurringExpenses RecurringExpense[]
@@ -117,13 +137,20 @@ model Category {
 }
 
 // ============================================
-// TRANSACTIONS (Income & Expenses)
+// TRANSACTIONS
 // ============================================
 enum TransactionStatus {
   PENDING
   COMPLETED
   CANCELLED
   SCHEDULED
+}
+
+// O "por quê" do gasto.
+enum SpendingNature {
+  ESSENTIAL
+  IMPORTANT
+  SUPERFLUOUS
 }
 
 model Transaction {
@@ -133,38 +160,46 @@ model Transaction {
   description         String
   type                TransactionType
   status              TransactionStatus @default(COMPLETED)
+  nature              SpendingNature?
+  note                String?
+  tags                String[]          @default([])
   installmentNumber   Int?              @map("installment_number")
   totalInstallments   Int?              @map("total_installments")
   parentTransactionId String?           @map("parent_transaction_id")
-  isRecurring         Boolean           @default(false) @map("is_recurring")
-  recurringFrequency  String?           @map("recurring_frequency")
+  invoiceMonth        String?           @map("invoice_month") // YYYY-MM em que a fatura do cartão fecha
   recurringExpenseId  String?           @map("recurring_expense_id")
+  occurrenceMonth     String?           @map("occurrence_month") // YYYY-MM do compromisso quitado
   source              DataSource        @default(MANUAL)
   pluggyTransactionId String?           @unique @map("pluggy_transaction_id")
+  metadata            Json?
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String   @map("user_id")
-  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  accountId   String   @map("account_id")
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  categoryId  String   @map("category_id")
-  attachments Attachment[]
-  parentTransaction Transaction?  @relation("Installments", fields: [parentTransactionId], references: [id])
-  childTransactions Transaction[] @relation("Installments")
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String            @map("user_id")
+  account           Account           @relation("TransactionAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  accountId         String            @map("account_id")
+  transferAccount   Account?          @relation("TransactionTransferAccount", fields: [transferAccountId], references: [id], onDelete: Cascade)
+  transferAccountId String?           @map("transfer_account_id")
+  category          Category?         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId        String?           @map("category_id")
+  attachments       Attachment[]
+  parentTransaction Transaction?      @relation("Installments", fields: [parentTransactionId], references: [id], onDelete: Cascade)
+  childTransactions Transaction[]     @relation("Installments")
   recurringExpense  RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
-  metadata    Json?
 
+  @@unique([recurringExpenseId, occurrenceMonth])
   @@index([userId, date])
   @@index([userId, type])
   @@index([accountId])
+  @@index([transferAccountId])
   @@index([categoryId])
+  @@index([accountId, invoiceMonth])
   @@map("transactions")
 }
 
 // ============================================
-// ATTACHMENTS (Receipts, Invoices)
+// ATTACHMENTS
 // ============================================
 model Attachment {
   id        String   @id @default(uuid())
@@ -181,26 +216,22 @@ model Attachment {
 }
 
 // ============================================
-// BUDGETS (Spending Goals by Category)
+// BUDGETS (limite mensal por categoria, vale para todo mês)
 // ============================================
 model Budget {
-  id          String   @id @default(uuid())
-  amount      Decimal  @db.Decimal(15, 2)
-  period      String   @default("MONTHLY")
-  startDate   DateTime @map("start_date")
-  endDate     DateTime @map("end_date")
-  alertAt80   Boolean  @default(true) @map("alert_at_80")
-  alertAt100  Boolean  @default(true) @map("alert_at_100")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  amount     Decimal  @db.Decimal(15, 2)
+  alertAt80  Boolean  @default(true) @map("alert_at_80")
+  alertAt100 Boolean  @default(true) @map("alert_at_100")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId     String   @map("user_id")
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId String   @map("category_id")
 
-  @@unique([userId, categoryId, period])
+  @@unique([userId, categoryId])
   @@map("budgets")
 }
 
@@ -231,14 +262,14 @@ model Notification {
 }
 
 // ============================================
-// RECURRING EXPENSES (Fixed, Installments, Loans, Subscriptions)
+// RECURRING (compromissos: fixas, assinaturas, carnês, empréstimos, receitas fixas)
 // ============================================
 enum RecurringType {
-  FIXED         // Aluguel, condomínio, internet
-  INSTALLMENT   // Parcelamentos em geral
-  CREDIT_CARD   // Parcelas de cartão
-  LOAN          // Empréstimos e financiamentos
-  SUBSCRIPTION  // Assinaturas (streaming, apps)
+  FIXED        // aluguel, condomínio, internet
+  SUBSCRIPTION // streaming, apps, academia
+  INSTALLMENT  // carnê / parcelamento fora do cartão
+  LOAN         // empréstimo, financiamento
+  INCOME       // salário, renda fixa
 }
 
 enum RecurringStatus {
@@ -255,34 +286,32 @@ enum RecurringFrequency {
 }
 
 model RecurringExpense {
-  id                  String             @id @default(uuid())
-  name                String
-  description         String?
-  type                RecurringType
-  status              RecurringStatus    @default(ACTIVE)
-  amount              Decimal            @db.Decimal(15, 2)
-  frequency           RecurringFrequency @default(MONTHLY)
-  dueDay              Int?               @map("due_day")              // dia do vencimento (1-31)
-  startDate           DateTime           @map("start_date")
-  endDate             DateTime?          @map("end_date")             // null = sem prazo (despesa fixa)
-  currentInstallment  Int?               @map("current_installment")
-  totalInstallments   Int?               @map("total_installments")
-  interestRate        Decimal?           @map("interest_rate") @db.Decimal(5, 2) // juros p/ empréstimos
-  cardName            String?            @map("card_name")            // nome do cartão
-  color               String             @default("#6366f1")
-  icon                String             @default("Repeat")
-  nextDueDate         DateTime?          @map("next_due_date")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
+  id                String             @id @default(uuid())
+  name              String
+  description       String?
+  type              RecurringType
+  status            RecurringStatus    @default(ACTIVE)
+  amount            Decimal            @db.Decimal(15, 2)
+  frequency         RecurringFrequency @default(MONTHLY)
+  dueDay            Int                @map("due_day")
+  startDate         DateTime           @map("start_date")
+  endDate           DateTime?          @map("end_date")
+  // Parcelados: número da parcela que vence no mês de startDate (ex.: cadastrei na 23ª de 48).
+  firstInstallment  Int                @default(1) @map("first_installment")
+  totalInstallments Int?               @map("total_installments")
+  interestRate      Decimal?           @map("interest_rate") @db.Decimal(5, 2)
+  color             String             @default("#8B8CFF")
+  icon              String             @default("Repeat")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String   @map("user_id")
-  category   Category? @relation(fields: [categoryId], references: [id])
-  categoryId String?  @map("category_id")
-  account    Account? @relation(fields: [accountId], references: [id])
-  accountId  String?  @map("account_id")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String        @map("user_id")
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId   String?       @map("category_id")
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  accountId    String?       @map("account_id")
   transactions Transaction[]
-  metadata   Json?
 
   @@index([userId, status])
   @@index([userId, type])

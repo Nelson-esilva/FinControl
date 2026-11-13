@@ -1,46 +1,83 @@
-import { IsNumber, IsOptional, IsString, IsBoolean, IsUUID, IsDateString, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+
+export const TRANSACTION_TYPES = ['INCOME', 'EXPENSE', 'PAYMENT'] as const;
+export const TRANSACTION_STATUSES = ['PENDING', 'COMPLETED', 'CANCELLED', 'SCHEDULED'] as const;
+export const NATURES = ['ESSENTIAL', 'IMPORTANT', 'SUPERFLUOUS'] as const;
 
 export class CreateTransactionDto {
-  @IsNumber()
+  /** Valor total. Com parcelas, é dividido entre elas (centavos extras na 1ª). */
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   amount: number;
 
   @IsDateString()
   date: string;
 
   @IsString()
+  @MaxLength(200)
   description: string;
 
-  @IsString()
-  @IsIn(['INCOME', 'EXPENSE', 'PAYMENT'])
-  type: string;
+  @IsIn(TRANSACTION_TYPES)
+  type: (typeof TRANSACTION_TYPES)[number];
 
   @IsOptional()
-  @IsString()
-  @IsIn(['PENDING', 'COMPLETED', 'CANCELLED', 'SCHEDULED'])
-  status?: string;
+  @IsIn(TRANSACTION_STATUSES)
+  status?: (typeof TRANSACTION_STATUSES)[number];
 
   @IsUUID()
   accountId: string;
 
+  /** Obrigatório em PAYMENT: conta que recebe (cartão, investimento, outra conta). */
+  @IsOptional()
   @IsUUID()
-  categoryId: string;
+  transferAccountId?: string;
 
   @IsOptional()
-  @IsNumber()
-  installmentNumber?: number;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
-  @IsNumber()
-  totalInstallments?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  isRecurring?: boolean;
+  @IsIn(NATURES)
+  nature?: (typeof NATURES)[number];
 
   @IsOptional()
   @IsString()
-  recurringFrequency?: string;
+  @MaxLength(500)
+  note?: string;
 
   @IsOptional()
-  metadata?: Record<string, any>;
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  totalInstallments?: number;
+
+  /** PAYMENT para cartão: qual fatura (mês de fechamento) está sendo paga. */
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+  invoiceMonth?: string;
 }

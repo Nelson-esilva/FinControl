@@ -1,21 +1,33 @@
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsNumber, IsOptional, IsPositive, IsUUID, Matches } from 'class-validator';
 
-export class LinkBillDto {
-  @IsString()
-  @Matches(/^\d{4}-\d{2}$/)
+export class PayBillDto {
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
   month: string;
 
+  /** Vincular a uma linha já existente do extrato (Pluggy) em vez de criar lançamento. */
   @IsOptional()
-  @IsString()
+  @IsUUID()
   transactionId?: string;
 
+  /** Conta que pagou/recebeu. Padrão: a conta do compromisso. */
   @IsOptional()
-  @IsString()
+  @IsUUID()
   accountId?: string;
+
+  /** Valor efetivamente pago (padrão: valor do compromisso). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount?: number;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
 
-export class UndoBillLinkDto {
-  @IsString()
-  @Matches(/^\d{4}-\d{2}$/)
+export class UndoBillDto {
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
   month: string;
 }

@@ -8,7 +8,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AttachmentsModule } from './attachments/attachments.module';
-import { DashboardModule } from './dashboard/dashboard.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { UploadModule } from './upload/upload.module';
 import { RecurringExpensesModule } from './recurring-expenses/recurring-expenses.module';
 import { PluggyModule } from './pluggy/pluggy.module';
@@ -19,7 +19,7 @@ import { HealthController } from './health.controller';
     PrismaModule,
     UploadModule,
     AuthModule,
-    DashboardModule,
+    AnalyticsModule,
     UsersModule,
     AccountsModule,
     CategoriesModule,

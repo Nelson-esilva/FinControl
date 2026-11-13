@@ -1,12 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { TransactionsService } from './transactions.service';
+import { TransactionsService, TransactionFilters } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { TransactionType, TransactionStatus } from '@prisma/client';
 
 @Controller('transactions')
 export class TransactionsController {
-  constructor(private readonly transactions: TransactionsService) { }
+  constructor(private readonly transactions: TransactionsService) {}
 
   @Post()
   create(@Body() dto: CreateTransactionDto) {
@@ -14,17 +13,13 @@ export class TransactionsController {
   }
 
   @Get()
-  findAll(
-    @Query('type') type?: TransactionType,
-    @Query('status') status?: TransactionStatus,
-    @Query('parentTransactionId') parentTransactionId?: string,
-    @Query('accountId') accountId?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('source') source?: string,
-  ) {
-    return this.transactions.findAll({ type, status, parentTransactionId, accountId, categoryId, from, to, source });
+  findAll(@Query() query: TransactionFilters) {
+    return this.transactions.findAll(query);
+  }
+
+  @Get('tags')
+  tags() {
+    return this.transactions.listTags();
   }
 
   @Get(':id')
@@ -42,8 +37,13 @@ export class TransactionsController {
     return this.transactions.pay(id);
   }
 
+  @Patch(':id/unpay')
+  unpay(@Param('id') id: string) {
+    return this.transactions.unpay(id);
+  }
+
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.transactions.remove(id);
+  remove(@Param('id') id: string, @Query('scope') scope?: string) {
+    return this.transactions.remove(id, scope === 'all' ? 'all' : 'one');
   }
 }

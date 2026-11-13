@@ -36,7 +36,7 @@ async function main() {
     await prisma.account.create({
       data: {
         userId: user.id,
-        name: 'Conta Principal',
+        name: 'Conta corrente',
         type: 'CHECKING',
         initialBalance: 0,
         currentBalance: 0,
@@ -45,15 +45,20 @@ async function main() {
   }
 
   const defaultCategories = [
-    { name: 'Salário', type: 'INCOME', color: '#10b981' },
-    { name: 'Alimentação', type: 'EXPENSE', color: '#f43f5e' },
-    { name: 'Transporte', type: 'EXPENSE', color: '#f59e0b' },
-    { name: 'Saúde', type: 'EXPENSE', color: '#ec4899' },
-    { name: 'Educação', type: 'EXPENSE', color: '#8b5cf6' },
-    { name: 'Moradia', type: 'EXPENSE', color: '#6366f1' },
-    { name: 'Lazer', type: 'EXPENSE', color: '#06b6d4' },
-    { name: 'Imprevistos', type: 'EXPENSE', color: '#ef4444' },
-    { name: 'Outros', description: 'gasto fixo', type: 'EXPENSE', color: '#6b7280' },
+    { name: 'Salário', type: 'INCOME', color: '#5CC8FF', icon: 'Briefcase' },
+    { name: 'Renda extra', type: 'INCOME', color: '#6ED3A8', icon: 'Sparkles' },
+    { name: 'Rendimentos', type: 'INCOME', color: '#8B8CFF', icon: 'TrendingUp' },
+    { name: 'Moradia', type: 'EXPENSE', color: '#8B8CFF', icon: 'Home' },
+    { name: 'Mercado', type: 'EXPENSE', color: '#6ED3A8', icon: 'ShoppingCart' },
+    { name: 'Restaurantes', type: 'EXPENSE', color: '#FF9F6B', icon: 'UtensilsCrossed' },
+    { name: 'Transporte', type: 'EXPENSE', color: '#E68AD8', icon: 'Car' },
+    { name: 'Saúde', type: 'EXPENSE', color: '#F47A8F', icon: 'HeartPulse' },
+    { name: 'Educação', type: 'EXPENSE', color: '#5CC8FF', icon: 'GraduationCap' },
+    { name: 'Lazer', type: 'EXPENSE', color: '#F7C948', icon: 'Gamepad2' },
+    { name: 'Compras', type: 'EXPENSE', color: '#B48CFF', icon: 'ShoppingBag' },
+    { name: 'Assinaturas', type: 'EXPENSE', color: '#4FD1C5', icon: 'Repeat' },
+    { name: 'Dívidas e juros', type: 'EXPENSE', color: '#F2994A', icon: 'Landmark' },
+    { name: 'Outros', type: 'EXPENSE', color: '#9AA1AD', icon: 'Tag' },
   ];
 
   for (const cat of defaultCategories) {
@@ -62,7 +67,7 @@ async function main() {
     });
     if (!existing) {
       await prisma.category.create({
-        data: { userId: user.id, name: cat.name, type: cat.type as any, color: cat.color, description: cat.description }
+        data: { userId: user.id, name: cat.name, type: cat.type as any, color: cat.color, icon: cat.icon, isDefault: true }
       });
     }
   }

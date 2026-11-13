@@ -9,8 +9,8 @@ import { AppShell } from "@/components/layout/app-shell"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "FinControl - Gestão Financeira Enterprise",
-  description: "Plataforma SaaS de Controle Financeiro de alto nível",
+  title: "FinControl",
+  description: "Controle de gastos, compromissos, orçamento e patrimônio",
 }
 
 export default function RootLayout({

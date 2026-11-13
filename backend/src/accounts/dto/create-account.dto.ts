@@ -1,23 +1,44 @@
-import { IsEnum, IsNumber, IsOptional, IsString, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { AccountType } from '@prisma/client';
 
 export class CreateAccountDto {
   @IsString()
+  @MaxLength(80)
   name: string;
 
   @IsEnum(AccountType)
   type: AccountType;
 
   @IsOptional()
-  @IsNumber()
+  @IsString()
+  @MaxLength(80)
+  institution?: string;
+
+  /** Saldo de abertura. Cartão: valor já devido (negativo). Investimento: total aplicado. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
   initialBalance?: number;
 
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   creditLimit?: number;
 
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  closingDay?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(31)
   dueDate?: number;
 
   @IsOptional()

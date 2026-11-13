@@ -2,28 +2,24 @@
 
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Sidebar } from "@/components/layout/sidebar"
-import { TopBar } from "@/components/layout/top-bar"
 import { useAuth } from "@/contexts/auth-context"
+import { QuickAddProvider } from "@/components/finance/quick-add"
+import { Sidebar } from "./sidebar"
+import { MobileHeader, MobileTabBar } from "./mobile-nav"
 
-const AUTH_PATHS = ["/login", "/signup"]
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, loading } = useAuth()
-  const isAuthPage = AUTH_PATHS.some((p) => pathname === p || pathname?.startsWith(p + "/"))
+  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname?.startsWith(p + "/"))
 
   useEffect(() => {
-    if (loading) return
-    if (!isAuthPage && !user) {
-      router.replace("/login")
-    }
-  }, [loading, user, isAuthPage, router])
+    if (!loading && !isPublic && !user) router.replace("/login")
+  }, [loading, user, isPublic, router])
 
-  if (isAuthPage) {
-    return <div className="min-h-screen bg-background">{children}</div>
-  }
+  if (isPublic) return <div className="min-h-screen bg-background">{children}</div>
 
   if (loading || !user) {
     return (
@@ -34,12 +30,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-auto bg-background p-6">{children}</main>
+    <QuickAddProvider>
+      <div className="min-h-screen bg-background lg:flex">
+        <Sidebar />
+        <div className="min-w-0 flex-1">
+          <MobileHeader />
+          <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-8">
+            {children}
+          </main>
+        </div>
+        <MobileTabBar />
       </div>
-    </div>
+    </QuickAddProvider>
   )
 }

@@ -32,7 +32,7 @@ Não leia `frontend/PROJECT_SUMMARY.md`. Não copie README para o contexto.
 
 1. `git status --short` na raiz `FinControl/`.
 2. `rg` no símbolo/rota; exclua `node_modules`, `.next`, `dist`, `uploads`.
-3. Leia alvo + DTO/tipo + um vizinho + consumidor (`api-data` / `api-recurring`). Pare.
+3. Leia alvo + DTO/tipo + um vizinho + consumidor (`lib/finance/client.ts`). Pare.
 4. Backend = dono da regra. Frontend = apresentação e chamada HTTP (`lib/api.ts`).
 5. Diff mínimo, tipado, reversível. Enums: `INCOME|EXPENSE|PAYMENT`.
 6. Valide o arquivo/módulo; typecheck se tipos mudaram. Sem `--fix` no repositório. Sem `dev`/browser.

@@ -30,7 +30,7 @@ export default function LoginPage() {
     const result = await login(email.trim(), password)
     setLoading(false)
     if (result.ok) {
-      router.push("/dashboard")
+      router.push("/")
     } else {
       setError(result.error ?? "E-mail ou senha inválidos.")
     }

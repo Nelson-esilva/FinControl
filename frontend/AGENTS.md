@@ -5,9 +5,9 @@ Leia `../AGENTS.md`. Skill: `.cursor/skills/fincontrol-frontend-change/SKILL.md`
 ## Padrão
 
 - Next.js 15 App Router, React 19, Tailwind, shadcn (`src/components/ui`), alias `@/`.
-- HTTP: `src/lib/api.ts`. Domínio: `api-data.ts`, `api-recurring.ts`. Sem Axios extra.
-- Não cresça `src/app/actions/` nem `src/lib/prisma.ts` (legado; schema local defasado).
-- Páginas em `src/app/<rota>/page.tsx`. Layout: `app-shell` + `sidebar` + `top-bar`.
+- HTTP: `src/lib/api.ts`. Domínio: `src/lib/finance/client.ts` (+ `types.ts`, `format.ts`); `api-data.ts` só usuários/perfil/Pluggy. Sem Axios extra.
+- Não use Prisma no Next (`frontend/prisma` só existe porque o Dockerfile ainda o copia).
+- Páginas em `src/app/<rota>/page.tsx`. Layout: `app-shell` + `sidebar` + `mobile-nav`. Blocos de UI em `components/finance/`.
 
 ## Auth e rotas
 

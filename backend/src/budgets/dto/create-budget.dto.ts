@@ -1,21 +1,15 @@
-import { IsNumber, IsOptional, IsString, IsBoolean, IsUUID, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsNumber, IsOptional, IsPositive, IsUUID } from 'class-validator';
 
+/** Limite mensal da categoria (vale para todos os meses). */
 export class CreateBudgetDto {
-  @IsNumber()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   amount: number;
 
   @IsUUID()
   categoryId: string;
-
-  @IsOptional()
-  @IsString()
-  period?: string;
-
-  @IsDateString()
-  startDate: string;
-
-  @IsDateString()
-  endDate: string;
 
   @IsOptional()
   @IsBoolean()
@@ -24,8 +18,4 @@ export class CreateBudgetDto {
   @IsOptional()
   @IsBoolean()
   alertAt100?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 }

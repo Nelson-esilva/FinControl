@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AccountsModule } from '../accounts/accounts.module';
 import { RecurringExpensesController } from './recurring-expenses.controller';
 import { RecurringExpensesService } from './recurring-expenses.service';
 
 @Module({
-    controllers: [RecurringExpensesController],
-    providers: [RecurringExpensesService],
+  imports: [AccountsModule],
+  controllers: [RecurringExpensesController],
+  providers: [RecurringExpensesService],
+  exports: [RecurringExpensesService],
 })
-export class RecurringExpensesModule { }
+export class RecurringExpensesModule {}
